@@ -3,20 +3,16 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { WobbleCard } from '@/components/ui/wobble-card';
 import {
   Database,
-  ArrowRight,
   BarChart3,
   Filter,
   Search,
   Globe,
-  Eye,
   Layers,
-  Zap,
   Star
 } from 'lucide-react';
 

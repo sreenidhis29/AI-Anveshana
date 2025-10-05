@@ -2,20 +2,11 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import {
-  Satellite,
-  ArrowRight,
-  Calendar,
-  Target,
-  Globe,
   Star,
-  Telescope,
-  Search,
-  Activity
 } from 'lucide-react';
 
 const missions = [
