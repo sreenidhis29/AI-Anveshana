@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { askClaude } from '@/helper/claude_aws';
+import { askGemini } from '@/helper/gemini_service';
 
 interface FormData {
   koi_score: string;
@@ -49,18 +49,18 @@ Your answer:`;
 
     try {
       const prompt = createPrompt(data);
-      
-   
-      const responseText = await askClaude(prompt);
-      
+
+
+      const responseText = await askGemini(prompt);
+
       if (!responseText) {
-        throw new Error('No response from Claude');
+        throw new Error('No response from Gemini');
       }
 
-     
+
       const cleanResponse = responseText.trim().toUpperCase();
-      
-      let disposition = "CANDIDATE"; 
+
+      let disposition = "CANDIDATE";
       if (cleanResponse.includes("CONFIRMED")) {
         disposition = "CONFIRMED";
       } else if (cleanResponse.includes("FALSE POSITIVE")) {
@@ -71,7 +71,7 @@ Your answer:`;
 
       return {
         disposition,
-        confidence: 0.85, 
+        confidence: 0.85,
         reasoning: `AI prediction: ${disposition}`,
       };
     } catch (err) {
@@ -90,16 +90,16 @@ Your answer:`;
 
     try {
       const results: PredictionResult[] = [];
-      
+
       for (let i = 0; i < dataArray.length; i++) {
         const data = dataArray[i];
-        
+
         try {
-          
+
           setLoading(false);
           const result = await predictSingle(data);
           setLoading(true);
-          
+
           if (result) {
             results.push(result);
           } else {
@@ -116,13 +116,13 @@ Your answer:`;
             reasoning: "Error processing row",
           });
         }
-        
-      
+
+
         if (i < dataArray.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }
-      
+
       return results;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Batch prediction failed';
