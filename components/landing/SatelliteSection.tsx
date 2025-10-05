@@ -23,7 +23,7 @@ const missions = [
     color: 'from-green-400 to-emerald-500',
     borderColor: 'border-green-400/20',
     bgColor: 'bg-green-400/5',
-    highlights: [' XGBoost Model', 'Claude 3.5']
+    highlights: [' XGBoost Model', 'Gemini']
   },
   {
     id: 'k2',
@@ -38,7 +38,7 @@ const missions = [
     color: 'from-blue-400 to-cyan-500',
     borderColor: 'border-blue-400/20',
     bgColor: 'bg-blue-400/5',
-    highlights: ['XGBoost Model', 'Claude 3.5']
+    highlights: ['XGBoost Model', 'Gemini']
   },
   {
     id: 'tess',
@@ -53,7 +53,7 @@ const missions = [
     color: 'from-purple-400 to-violet-500',
     borderColor: 'border-purple-400/20',
     bgColor: 'bg-purple-400/5',
-    highlights: ['LGBM Model', 'Claude 3.5']
+    highlights: ['LGBM Model', 'Gemini']
   }
 ];
 

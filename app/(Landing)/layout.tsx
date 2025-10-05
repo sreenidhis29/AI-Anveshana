@@ -1,5 +1,7 @@
 import React from 'react';
 import type { Metadata } from 'next';
+import { StarsBackground } from '@/components/animate-ui/components/backgrounds/stars';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   title: 'AI Anveshana - AI-Powered Exoplanet Discovery Platform | Built with AI Assistance',
@@ -81,5 +83,18 @@ interface LandingLayoutProps {
 }
 
 export default function LandingLayout({ children }: LandingLayoutProps) {
-  return <>{children}</>;
+  return (
+    <div className="relative min-h-screen">
+      <StarsBackground
+        starColor={'#FFF'}
+        className={cn(
+          'pointer-events-none fixed inset-0 z-0',
+          'bg-[radial-gradient(ellipse_at_bottom,_#262626_0%,_#000_100%)]',
+        )}
+      />
+      <div className="relative z-10">
+        {children}
+      </div>
+    </div>
+  );
 }
