@@ -394,7 +394,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-KEY': 'QzQBpd3vd1K4fBeRdPMBvH4rwphF7Nns4Y-T1cfj9PY'
+          'X-API-KEY': ''
         },
         body: JSON.stringify(payload),
       });
