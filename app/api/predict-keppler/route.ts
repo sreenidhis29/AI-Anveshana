@@ -1,52 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-} from "@aws-sdk/client-bedrock-runtime";
+import { askGemini } from '@/helper/gemini_service';
 
-const modelId = "us.anthropic.claude-3-5-sonnet-20241022-v2:0";
+// Using Gemini via helper
 
 export async function POST(request: NextRequest) {
-  console.log("Starting exoplanet analysis with Claude AI");
+  console.log("Starting exoplanet analysis with Gemini");
   try {
     const data = await request.json();
-    
-    // Extract credentials from request body if provided
-    const {
-      aws_region,
-      aws_access_key_id,
-      aws_secret_access_key,
-      ...planetData
-    } = data;
-    
-    // Determine which credentials to use (user-provided or environment variables)
-    const region = aws_region || process.env.AWS_REGION;
-    const accessKeyId = aws_access_key_id || process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = aws_secret_access_key || process.env.AWS_SECRET_ACCESS_KEY;
-    
-    // Check if we have valid credentials
-    if (!region || !accessKeyId || !secretAccessKey) {
-      return NextResponse.json(
-        { 
-          error: 'Missing AWS credentials. Please provide AWS Region, Access Key ID, and Secret Access Key either through environment variables or in the request.',
-          success: false,
-          missingCredentials: true
-        },
-        { status: 400 }
-      );
-    }
-    
-    // Create Bedrock client with available credentials
-    const client = new BedrockRuntimeClient({
-      region: region,
-      credentials: {
-        accessKeyId: accessKeyId,
-        secretAccessKey: secretAccessKey,
-      },
-    });
-    
-   
-    
+
+    const { ...planetData } = data;
+
     // Extract exoplanet parameters
     const {
       koi_score,
@@ -63,7 +26,7 @@ export async function POST(request: NextRequest) {
       koi_srad,
       koi_model_snr,
       koi_srho
-    } = planetData;    
+    } = planetData;
     const prompt = `You are an expert exoplanet astronomer analyzing Kepler Objects of Interest (KOI) data. Please analyze the following exoplanet parameters and provide a scientific assessment.
 
 EXOPLANET PARAMETERS:
@@ -103,39 +66,28 @@ REQUIRED OUTPUT FORMAT (respond with EXACTLY this JSON structure):
 
 Based on the scientific analysis of these parameters, what is your assessment? Consider false positive scenarios like stellar activity, binary star contamination, or instrumental artifacts.`;
 
-    console.log('Sending exoplanet data to Claude for analysis...');
+    console.log('Sending exoplanet data to Gemini for analysis...');
+    const responseText = await askGemini(prompt);
 
-    const command = new ConverseCommand({
-      modelId: modelId,
-      messages: [{ role: "user", content: [{ text: prompt }] }],
-      inferenceConfig: {
-        maxTokens: 1000,
-        temperature: 0.1,
-      },
-    });
-
-    const response = await client.send(command);
-    const responseText = response.output?.message?.content?.[0]?.text;
-    
     if (!responseText) {
-      throw new Error('No response from Claude');
+      throw new Error('No response from Gemini');
     }
 
-    console.log('Claude AI Analysis:', responseText);
+    console.log('Gemini Analysis:', responseText);
 
     try {
       const analysisResult = JSON.parse(responseText);
-      
+
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
         throw new Error('Invalid response format from Claude');
       }
 
       const validDispositions = ['CONFIRMED', 'CANDIDATE', 'FALSE POSITIVE'];
       if (!validDispositions.includes(analysisResult.disposition)) {
-        analysisResult.disposition = 'CANDIDATE'; 
+        analysisResult.disposition = 'CANDIDATE';
       }
 
-      
+
       analysisResult.confidence = Math.max(0.0, Math.min(1.0, analysisResult.confidence));
 
       return NextResponse.json({
@@ -164,13 +116,13 @@ Based on the scientific analysis of these parameters, what is your assessment? C
       });
 
     } catch (parseError) {
-      console.error('Error parsing Claude response:', parseError);
+      console.error('Error parsing Gemini response:', parseError);
       console.log('Raw Claude response:', responseText);
-      
-      
+
+
       const disposition = responseText.toLowerCase().includes('confirmed') ? 'CONFIRMED' :
-                         responseText.toLowerCase().includes('false positive') ? 'FALSE POSITIVE' : 'CANDIDATE';
-      
+        responseText.toLowerCase().includes('false positive') ? 'FALSE POSITIVE' : 'CANDIDATE';
+
       return NextResponse.json({
         disposition,
         confidence: 0.5,
@@ -198,12 +150,12 @@ Based on the scientific analysis of these parameters, what is your assessment? C
 
   } catch (error) {
     console.error('Error in exoplanet prediction API:', error);
-    
+
     // Handle specific AWS credential errors
     if (error instanceof Error) {
       if (error.message.includes('credentials') || error.message.includes('authentication')) {
         return NextResponse.json(
-          { 
+          {
             error: 'AWS authentication failed. Please check your credentials and ensure they have the correct permissions for Bedrock.',
             success: false,
             credentialError: true
@@ -211,10 +163,10 @@ Based on the scientific analysis of these parameters, what is your assessment? C
           { status: 401 }
         );
       }
-      
+
       if (error.message.includes('region')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Invalid AWS region. Please check your region setting.',
             success: false,
             regionError: true
@@ -223,11 +175,11 @@ Based on the scientific analysis of these parameters, what is your assessment? C
         );
       }
     }
-    
+
     return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : 'Failed to get prediction from Claude AI',
-        success: false 
+      {
+        error: error instanceof Error ? error.message : 'Failed to get prediction from Gemini',
+        success: false
       },
       { status: 500 }
     );

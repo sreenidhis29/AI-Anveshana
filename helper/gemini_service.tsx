@@ -24,7 +24,7 @@ export class GeminiService {
   private chatHistory: ChatMessage[] = [];
 
   constructor() {
-    this.model = genAI.getGenerativeModel({ 
+    this.model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       systemInstruction: SYSTEM_PROMPT
     });
@@ -46,9 +46,9 @@ export class GeminiService {
 
       // Stream the response
       const result = await chat.sendMessageStream(userMessage);
-      
+
       let fullResponse = '';
-      
+
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         fullResponse += chunkText;
@@ -80,3 +80,19 @@ export class GeminiService {
 
 // Export singleton instance
 export const geminiService = new GeminiService();
+
+// Simple single-shot helper for analysis prompts that expect a full text/JSON answer
+export async function askGemini(prompt: string): Promise<string> {
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    if (!text) {
+      throw new Error('No response from Gemini');
+    }
+    return text;
+  } catch (error) {
+    console.error('Gemini generateContent error:', error);
+    throw new Error('Failed to get response from Gemini');
+  }
+}

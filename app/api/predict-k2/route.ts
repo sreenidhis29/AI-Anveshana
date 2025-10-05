@@ -1,48 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-} from "@aws-sdk/client-bedrock-runtime";
-
-
-const client = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || process.env.NEXT_AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_AWS_SECRET_ACCESS_KEY || '',
-  },
-});
-
-
-function validateAWSCredentials(): boolean {
-  return !!(
-    (process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_AWS_ACCESS_KEY_ID) && 
-    (process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_AWS_SECRET_ACCESS_KEY) && 
-    (process.env.AWS_REGION || process.env.NEXT_AWS_REGION)
-  );
-}
-
-
-const modelId = "us.anthropic.claude-3-5-sonnet-20241022-v2:0";
+import { askGemini } from '@/helper/gemini_service';
 
 export async function POST(request: NextRequest) {
-  console.log("Starting K2 exoplanet analysis with Claude AI");
+  console.log("Starting K2 exoplanet analysis with Gemini");
   try {
     const data = await request.json();
-    
-   
-    if (!validateAWSCredentials()) {
-      console.log('AWS credentials not configured');
-      return NextResponse.json(
-        { 
-          error: 'AWS credentials not configured. Please set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables.',
-          success: false 
-        },
-        { status: 500 }
-      );
-    }
-    
-    
+
     const {
       pl_orbper,
       pl_trandep,
@@ -130,42 +93,31 @@ Consider K2-specific challenges such as:
 
 Based on your scientific analysis of these K2 mission parameters, what is your assessment?`;
 
-    console.log('Sending K2 exoplanet data to Claude for analysis...');
+    console.log('Sending K2 exoplanet data to Gemini for analysis...');
+    const responseText = await askGemini(prompt);
 
-    const command = new ConverseCommand({
-      modelId: modelId,
-      messages: [{ role: "user", content: [{ text: prompt }] }],
-      inferenceConfig: {
-        maxTokens: 1000,
-        temperature: 0.1, 
-      },
-    });
-
-    const response = await client.send(command);
-    const responseText = response.output?.message?.content?.[0]?.text;
-    
     if (!responseText) {
-      throw new Error('No response from Claude');
+      throw new Error('No response from Gemini');
     }
 
-    console.log('Claude AI K2 Analysis:', responseText);
+    console.log('Gemini K2 Analysis:', responseText);
 
     try {
-     
+
       const analysisResult = JSON.parse(responseText);
-      
-   
+
+
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
         throw new Error('Invalid response format from Claude');
       }
 
-      
+
       const validDispositions = ['CONFIRMED', 'CANDIDATE', 'FALSE POSITIVE'];
       if (!validDispositions.includes(analysisResult.disposition)) {
-        analysisResult.disposition = 'CANDIDATE'; 
+        analysisResult.disposition = 'CANDIDATE';
       }
 
-      
+
       analysisResult.confidence = Math.max(0.0, Math.min(1.0, analysisResult.confidence));
 
       return NextResponse.json({
@@ -199,11 +151,11 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
     } catch (parseError) {
       console.error('Error parsing Claude response:', parseError);
       console.log('Raw Claude response:', responseText);
-      
-  
+
+
       const disposition = responseText.toLowerCase().includes('confirmed') ? 'CONFIRMED' :
-                         responseText.toLowerCase().includes('false positive') ? 'FALSE POSITIVE' : 'CANDIDATE';
-      
+        responseText.toLowerCase().includes('false positive') ? 'FALSE POSITIVE' : 'CANDIDATE';
+
       return NextResponse.json({
         disposition,
         confidence: 0.5,
@@ -234,33 +186,33 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
 
   } catch (error) {
     console.error('Error in K2 exoplanet prediction API:', error);
-    
-    
+
+
     if (error instanceof Error && error.message.includes('credential')) {
       return NextResponse.json(
-        { 
+        {
           error: 'AWS credentials error. Please check your AWS configuration.',
-          success: false 
+          success: false
         },
         { status: 401 }
       );
     }
-    
-    
+
+
     if (error instanceof Error && error.message.includes('access')) {
       return NextResponse.json(
-        { 
+        {
           error: 'Claude model access denied. Please check your AWS Bedrock permissions.',
-          success: false 
+          success: false
         },
         { status: 403 }
       );
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Failed to get K2 prediction from Claude AI',
-        success: false 
+        success: false
       },
       { status: 500 }
     );

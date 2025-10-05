@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  X, 
-  Activity, 
-  Globe, 
-  Sun, 
-  Thermometer, 
+import {
+  X,
+  Activity,
+  Globe,
+  Sun,
+  Thermometer,
   Zap,
   Orbit,
   Gauge,
@@ -217,11 +217,17 @@ const parameters: ParameterConfig[] = [
   }
 ];
 
-export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPanelProps) {
+export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPanelProps) {
   const [formData, setFormData] = useState(planet);
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
   const [userCredentials, setUserCredentials] = useState<AWSCredentials | null>(null);
   const [hasEnvCredentials, setHasEnvCredentials] = useState(false);
+
+  const formatConfidencePercent = (value?: number) => {
+    if (value === undefined || value === null || isNaN(value)) return '—';
+    const pct = value <= 1 ? value * 100 : value;
+    return `${pct.toFixed(1)}%`;
+  };
 
   useEffect(() => {
     setFormData(planet);
@@ -294,7 +300,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
       }
 
       const result = await response.json();
-      
+
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
       if (result.disposition === 'CONFIRMED') {
         prediction = 'confirmed';
@@ -304,8 +310,8 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
         prediction = 'candidate';
       }
 
-      onUpdate({ 
-        isAnalyzing: false, 
+      onUpdate({
+        isAnalyzing: false,
         prediction: prediction,
         claudeResponse: {
           disposition: result.disposition,
@@ -319,7 +325,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
     } catch (error) {
       console.error('Analysis failed:', error);
       onUpdate({ isAnalyzing: false });
-      
+
       // Show user-friendly error message without auto-reopening dialog
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
       if (errorMessage.includes('credential') || errorMessage.includes('auth')) {
@@ -333,7 +339,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
   const handleCredentialsSubmit = (credentials: AWSCredentials) => {
     setUserCredentials(credentials);
     setShowCredentialsDialog(false);
-    
+
     // Retry the analysis with the provided credentials
     setTimeout(() => {
       handleAnalyze();
@@ -341,16 +347,8 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
   };
 
   const handleClaudeAnalyzeClick = () => {
-    if (!hasEnvCredentials && !userCredentials) {
-      // No environment variables and no user credentials - must provide credentials
-      setShowCredentialsDialog(true);
-    } else if (hasEnvCredentials && !userCredentials) {
-      // Environment variables available - show dialog but allow skip
-      setShowCredentialsDialog(true);
-    } else {
-      // User credentials already provided - proceed with analysis
-      handleAnalyze();
-    }
+    // Gemini does not require AWS credentials; invoke directly
+    handleAnalyze();
   };
 
   const handleCredentialsSkip = () => {
@@ -405,9 +403,9 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
 
       const result = await response.json();
       console.log('Flask API Response:', result);
-      
+
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
-      
+
       if (result.archive_disposition === 'CONFIRMED') {
         prediction = 'confirmed';
       } else if (result.archive_disposition === 'FALSE POSITIVE') {
@@ -418,8 +416,8 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
         prediction = 'candidate';
       }
 
-      onUpdate({ 
-        isAnalyzing: false, 
+      onUpdate({
+        isAnalyzing: false,
         prediction: prediction,
         flaskResponse: {
           archive_disposition: result.archive_disposition,
@@ -433,7 +431,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
     } catch (error) {
       console.error('Flask analysis failed:', error);
       onUpdate({ isAnalyzing: false });
-      
+
       alert(`Flask API Error: ${error instanceof Error ? error.message : 'Connection failed. Make sure Flask server is running on http://127.0.0.1:5000'}`);
     }
   };
@@ -483,9 +481,9 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
       initial={{ x: '100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 300, 
+      transition={{
+        type: 'spring',
+        stiffness: 300,
         damping: 30,
         opacity: { duration: 0.2 }
       }}
@@ -520,7 +518,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
 
             <div className="mt-4">
               {getPredictionBadge()}
-              
+
               {/* Credential Status */}
               <div className="mt-2 flex items-center gap-2">
                 {userCredentials ? (
@@ -552,8 +550,8 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
                   className="group"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Label 
-                      htmlFor={param.key} 
+                    <Label
+                      htmlFor={param.key}
                       className="text-sm font-medium text-gray-300 flex items-center gap-2 group-hover:text-white transition-colors"
                     >
                       <span className="text-orange-400">{param.icon}</span>
@@ -573,7 +571,7 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
                       step={param.step}
                       className="w-full"
                     />
-                    
+
                     <Input
                       id={param.key}
                       type="number"
@@ -610,17 +608,12 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
                 {planet.isAnalyzing ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Analyzing with Claude AI...</span>
+                    <span>Analyzing with Gemini...</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2">
                     <Zap className="h-4 w-4" />
-                    <span>Analyze with Claude AI</span>
-                    {userCredentials && (
-                      <Badge variant="outline" className="ml-2 border-green-400/50 text-green-400 bg-green-400/10 text-xs">
-                        ✓
-                      </Badge>
-                    )}
+                    <span>Analyze with Gemini</span>
                   </div>
                 )}
               </Button>
@@ -645,80 +638,86 @@ export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPa
                   </div>
                 )}
               </Button>
-              
+
               {/* Info Text */}
               <div className="text-xs text-gray-500 text-center space-y-1 my-3">
-                <p><strong>Claude AI:</strong> Advanced reasoning & scientific analysis</p>
+                <p><strong>Gemini:</strong> Advanced reasoning & scientific analysis</p>
                 <p><strong>ML Model:</strong> Trained on K2 mission dataset patterns</p>
-                <p className="flex "><AlertCircle className="h-3 w-3"/> AI models can make mistakes. Please review results carefully.</p>
+                <p className="flex "><AlertCircle className="h-3 w-3" /> AI models can make mistakes. Please review results carefully.</p>
               </div>
             </div>
 
-          {/* Analysis Results */}
-          {(planet.claudeResponse || planet.flaskResponse) && (
-            <Card className="bg-gray-800/50 border-gray-700/50">
-              <CardHeader>
-                <CardTitle className="text-sm text-gray-300">Analysis Results</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {planet.claudeResponse && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-blue-400" />
-                      <span className="text-sm font-medium text-blue-300">Claude AI Analysis</span>
-                    </div>
-                    <div className="pl-6 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Disposition:</span>
-                        <span className="text-blue-300">{planet.claudeResponse.disposition}</span>
+            {/* Analysis Results */}
+            {(planet.claudeResponse || planet.flaskResponse) && (
+              <Card className="bg-gray-800/50 border-gray-700/50">
+                <CardHeader>
+                  <CardTitle className="text-sm text-gray-300">Analysis Results</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {planet.claudeResponse && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-blue-400" />
+                        <span className="text-sm font-medium text-blue-300">Gemini Analysis</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Confidence:</span>
-                        <span className="text-blue-300">{planet.claudeResponse.confidence}%</span>
-                      </div>
-                      {planet.claudeResponse.planet_type && (
+                      <div className="pl-6 space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-gray-400">Type:</span>
-                          <span className="text-blue-300">{planet.claudeResponse.planet_type}</span>
+                          <span className="text-gray-400">Is Exoplanet:</span>
+                          <span className={`font-medium ${planet.claudeResponse.disposition === 'FALSE POSITIVE' ? 'text-red-300' : 'text-green-300'}`}>
+                            {planet.claudeResponse.disposition === 'FALSE POSITIVE' ? '❌ No' : '✅ Yes'}
+                          </span>
                         </div>
-                      )}
-                      {planet.claudeResponse.reasoning && (
-                        <div className="mt-2">
-                          <span className="text-gray-400 text-xs">Reasoning:</span>
-                          <p className="text-blue-200 text-xs mt-1 p-2 bg-blue-900/20 rounded border border-blue-800/30">
-                            {planet.claudeResponse.reasoning}
-                          </p>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Disposition:</span>
+                          <span className="text-blue-300">{planet.claudeResponse.disposition}</span>
                         </div>
-                      )}
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Confidence:</span>
+                          <span className="text-blue-300">{formatConfidencePercent(planet.claudeResponse.confidence)}</span>
+                        </div>
+                        {planet.claudeResponse.planet_type && (
+                          <div className="flex justify-between">
+                            <span className="text-gray-400">Type:</span>
+                            <span className="text-blue-300">{planet.claudeResponse.planet_type}</span>
+                          </div>
+                        )}
+                        {planet.claudeResponse.reasoning && (
+                          <div className="mt-2">
+                            <span className="text-gray-400 text-xs">Reasoning:</span>
+                            <p className="text-blue-200 text-xs mt-1 p-2 bg-blue-900/20 rounded border border-blue-800/30">
+                              {planet.claudeResponse.reasoning}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {planet.flaskResponse && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-green-400" />
-                      <span className="text-sm font-medium text-green-300">ML Model Analysis</span>
+                  {planet.flaskResponse && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-green-400" />
+                        <span className="text-sm font-medium text-green-300">ML Model Analysis</span>
+                      </div>
+                      <div className="pl-6 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Disposition:</span>
+                          <span className="text-green-300">{planet.flaskResponse.archive_disposition}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Planet Type:</span>
+                          <span className="text-green-300">{planet.flaskResponse.planet_type}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-400">Probability:</span>
+                          <span className="text-green-300">{(planet.flaskResponse.probability * 100).toFixed(1)}%</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="pl-6 space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Disposition:</span>
-                        <span className="text-green-300">{planet.flaskResponse.archive_disposition}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Planet Type:</span>
-                        <span className="text-green-300">{planet.flaskResponse.planet_type}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Probability:</span>
-                        <span className="text-green-300">{(planet.flaskResponse.probability * 100).toFixed(1)}%</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </CardContent>
         </Card>
       </div>

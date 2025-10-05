@@ -1,54 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-} from "@aws-sdk/client-bedrock-runtime";
+import { askGemini } from '@/helper/gemini_service';
 
 
-const client = new BedrockRuntimeClient({
-  region: process.env.AWS_REGION || process.env.NEXT_AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_AWS_SECRET_ACCESS_KEY || '',
-  },
-});
-
-
-function validateAWSCredentials(): boolean {
-  return !!(
-    (process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_AWS_ACCESS_KEY_ID) && 
-    (process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_AWS_SECRET_ACCESS_KEY) && 
-    (process.env.AWS_REGION || process.env.NEXT_AWS_REGION)
-  );
-}
-
-
-const modelId = "us.anthropic.claude-3-5-sonnet-20241022-v2:0";
+// Gemini does not require AWS credentials
 
 export async function POST(request: NextRequest) {
-  console.log("🚀 Starting TESS exoplanet analysis with Claude AI");
-  
+  console.log("🚀 Starting TESS exoplanet analysis with Gemini");
+
   try {
     const data = await request.json();
-    
-    
-   
-    if (!validateAWSCredentials()) {
-      console.log('❌ AWS credentials not configured');
-      return NextResponse.json(
-        { 
-          error: 'AWS credentials not configured. Please set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION environment variables.',
-          success: false,
-          debug: {
-            hasAccessKey: !!(process.env.AWS_ACCESS_KEY_ID || process.env.NEXT_AWS_ACCESS_KEY_ID),
-            hasSecretKey: !!(process.env.AWS_SECRET_ACCESS_KEY || process.env.NEXT_AWS_SECRET_ACCESS_KEY),
-            hasRegion: !!(process.env.AWS_REGION || process.env.NEXT_AWS_REGION),
-          }
-        },
-        { status: 500 }
-      );
-    }
-    
+
 
     const {
       pl_orbper,
@@ -66,27 +27,27 @@ export async function POST(request: NextRequest) {
       dec
     } = data;
 
-  
+
     const requiredParams = [
-      'pl_orbper', 'pl_trandurh', 'pl_trandep', 'pl_rade', 
-      'pl_insol', 'pl_eqt', 'st_teff', 'st_logg', 'st_rad', 
+      'pl_orbper', 'pl_trandurh', 'pl_trandep', 'pl_rade',
+      'pl_insol', 'pl_eqt', 'st_teff', 'st_logg', 'st_rad',
       'st_tmag', 'st_dist', 'ra', 'dec'
     ];
-    
+
     const missingParams = requiredParams.filter(param => data[param] === undefined || data[param] === null);
     if (missingParams.length > 0) {
       console.log('Missing required parameters:', missingParams);
       return NextResponse.json(
-        { 
+        {
           error: `Missing required parameters: ${missingParams.join(', ')}`,
-          success: false 
+          success: false
         },
         { status: 400 }
       );
     }
 
 
-    
+
     const prompt = `You are an expert exoplanet astronomer analyzing TESS (Transiting Exoplanet Survey Satellite) mission data. TESS conducts an all-sky survey observing different sectors for ~27 days each, optimized for detecting short-period transiting planets around nearby bright stars. Please analyze the following TESS exoplanet parameters and provide a scientific assessment.
 
 TESS EXOPLANET PARAMETERS:
@@ -162,44 +123,30 @@ Consider TESS-specific factors such as:
 
 Based on your scientific analysis of these TESS mission parameters, what is your assessment?`;
 
-    console.log('🤖 Sending TESS exoplanet data to Claude for analysis...');
+    console.log('🤖 Sending TESS exoplanet data to Gemini for analysis...');
+    const responseText = await askGemini(prompt);
 
-    const command = new ConverseCommand({
-      modelId: modelId,
-      messages: [{ role: "user", content: [{ text: prompt }] }],
-      inferenceConfig: {
-        maxTokens: 1000,
-        temperature: 0.1, 
-      },
-    });
-
-    console.log('📡 Calling AWS Bedrock...');
-    const response = await client.send(command);
-    console.log('✅ Received response from AWS Bedrock');
-    
-    const responseText = response.output?.message?.content?.[0]?.text;
-    
     if (!responseText) {
-      console.log('❌ No response text from Claude');
-      throw new Error('No response from Claude');
+      console.log('❌ No response text from Gemini');
+      throw new Error('No response from Gemini');
     }
 
-    console.log('🧠 Claude AI TESS Analysis response length:', responseText.length);
-    console.log('📝 Claude response preview:', responseText.substring(0, 200) + '...');
+    console.log('🧠 Gemini TESS Analysis response length:', responseText.length);
+    console.log('📝 Gemini response preview:', responseText.substring(0, 200) + '...');
 
     try {
-      
+
       const analysisResult = JSON.parse(responseText);
-      
-    
+
+
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
         throw new Error('Invalid response format from Claude');
       }
 
-    
+
       const validDispositions = ['PC', 'CP', 'FP', 'APC', 'KP'];
       if (!validDispositions.includes(analysisResult.disposition)) {
-        analysisResult.disposition = 'PC'; 
+        analysisResult.disposition = 'PC';
       }
 
       analysisResult.confidence = Math.max(0.0, Math.min(1.0, analysisResult.confidence));
@@ -230,13 +177,13 @@ Based on your scientific analysis of these TESS mission parameters, what is your
       });
 
     } catch (parseError) {
-      console.error('Error parsing Claude response:', parseError);
+      console.error('Error parsing Gemini response:', parseError);
       console.log('Raw Claude response:', responseText);
-      
-   
-      let disposition = 'PC'; 
+
+
+      let disposition = 'PC';
       const lowText = responseText.toLowerCase();
-      
+
       if (lowText.includes('confirmed') || lowText.includes(' cp ')) {
         disposition = 'CP';
       } else if (lowText.includes('false positive') || lowText.includes(' fp ')) {
@@ -248,7 +195,7 @@ Based on your scientific analysis of these TESS mission parameters, what is your
       } else if (lowText.includes('candidate') || lowText.includes(' pc ')) {
         disposition = 'PC';
       }
-      
+
       return NextResponse.json({
         disposition,
         confidence: 0.5,
@@ -276,32 +223,32 @@ Based on your scientific analysis of these TESS mission parameters, what is your
 
   } catch (error) {
     console.error('Error in TESS exoplanet prediction API:', error);
-    
+
     if (error instanceof Error && error.message.includes('credential')) {
       return NextResponse.json(
-        { 
+        {
           error: 'AWS credentials error. Please check your AWS configuration.',
-          success: false 
+          success: false
         },
         { status: 401 }
       );
     }
-    
+
 
     if (error instanceof Error && error.message.includes('access')) {
       return NextResponse.json(
-        { 
+        {
           error: 'Claude model access denied. Please check your AWS Bedrock permissions.',
-          success: false 
+          success: false
         },
         { status: 403 }
       );
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Failed to get TESS prediction from Claude AI',
-        success: false 
+        success: false
       },
       { status: 500 }
     );

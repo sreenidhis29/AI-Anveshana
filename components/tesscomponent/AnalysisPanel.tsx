@@ -177,6 +177,12 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
   const [userCredentials, setUserCredentials] = useState<AWSCredentials | null>(null);
   const [hasEnvCredentials, setHasEnvCredentials] = useState(false);
 
+  const formatConfidencePercent = (value?: number) => {
+    if (value === undefined || value === null || isNaN(value)) return '—';
+    const pct = value <= 1 ? value * 100 : value;
+    return `${pct.toFixed(1)}%`;
+  };
+
   useEffect(() => {
     setFormData(planet);
   }, [planet]);
@@ -229,12 +235,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
         st_tmag: formData.st_tmag,
         st_dist: formData.st_dist,
         ra: formData.ra,
-        dec: formData.dec,
-        ...(userCredentials && {
-          aws_region: userCredentials.aws_region,
-          aws_access_key_id: userCredentials.aws_access_key_id,
-          aws_secret_access_key: userCredentials.aws_secret_access_key,
-        })
+        dec: formData.dec
       };
 
       const response = await fetch('/api/predict-tess', {
@@ -250,20 +251,20 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
       }
 
       const result = await response.json();
-      
+
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
       if (result.disposition === 'CP' || result.disposition === 'KP') {
         prediction = 'confirmed';
       } else if (result.disposition === 'FP') {
         prediction = 'false-positive';
       } else {
-      
+
         prediction = 'candidate';
       }
 
-     
-      onUpdate({ 
-        isAnalyzing: false, 
+
+      onUpdate({
+        isAnalyzing: false,
         prediction: prediction,
         claudeResponse: {
           disposition: result.disposition,
@@ -277,13 +278,9 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
     } catch (error) {
       console.error('Analysis failed:', error);
       onUpdate({ isAnalyzing: false });
-      
-      const errorMessage = error instanceof Error ? error.message : 'TESS analysis failed. Please check your AWS credentials and try again.';
-      if (errorMessage.includes('credential') || errorMessage.includes('auth')) {
-        alert(`Claude AI Analysis Error: ${errorMessage}\n\nPlease click "Analyze with Claude AI" again to configure credentials.`);
-      } else {
-        alert(`Claude AI Analysis Error: ${errorMessage}`);
-      }
+
+      const errorMessage = error instanceof Error ? error.message : 'TESS analysis failed. Please try again.';
+      alert(`Gemini Analysis Error: ${errorMessage}`);
     }
   };
 
@@ -294,13 +291,8 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
   };
 
   const handleClaudeAnalyzeClick = () => {
-    if (!hasEnvCredentials && !userCredentials) {
-      setShowCredentialsDialog(true);
-    } else if (hasEnvCredentials && !userCredentials) {
-      setShowCredentialsDialog(true);
-    } else {
-      handleAnalyze();
-    }
+    // Gemini does not require AWS credentials; invoke directly
+    handleAnalyze();
   };
 
   const handleCredentialsSkip = () => {
@@ -314,7 +306,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
 
   const handleFlaskAnalyze = async () => {
     try {
-     
+
       onUpdate({ isAnalyzing: true });
 
       const payload = {
@@ -350,10 +342,10 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
 
       const result = await response.json();
       console.log('Flask API Response:', result);
-      
-    
+
+
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
-      
+
       // Determine prediction based on tfopwg_disp
       // CP (Confirmed Planet), KP (Known Planet) -> confirmed
       // FP (False Positive), FA (False Alarm) -> false-positive
@@ -367,9 +359,9 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
         prediction = 'candidate';
       }
 
-   
-      onUpdate({ 
-        isAnalyzing: false, 
+
+      onUpdate({
+        isAnalyzing: false,
         prediction: prediction,
         flaskResponse: {
           tfopwg_disp: result.tfopwg_disp,
@@ -384,8 +376,8 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
     } catch (error) {
       console.error('Flask analysis failed:', error);
       onUpdate({ isAnalyzing: false });
-      
-   
+
+
       alert(`Flask API Error: ${error instanceof Error ? error.message : 'Connection failed. Make sure Flask server is running on http://127.0.0.1:5000'}`);
     }
   };
@@ -435,9 +427,9 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
       initial={{ x: '100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
-      transition={{ 
-        type: 'spring', 
-        stiffness: 300, 
+      transition={{
+        type: 'spring',
+        stiffness: 300,
         damping: 30,
         opacity: { duration: 0.2 }
       }}
@@ -472,7 +464,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
 
             <div className="mt-4">
               {getPredictionBadge()}
-              
+
               <div className="mt-2 flex items-center gap-2">
                 {userCredentials ? (
                   <Badge variant="outline" className="border-green-400/50 text-green-400 bg-green-400/10 text-xs">
@@ -503,8 +495,8 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                   className="group"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Label 
-                      htmlFor={param.key} 
+                    <Label
+                      htmlFor={param.key}
                       className="text-sm font-medium text-gray-300 flex items-center gap-2 group-hover:text-white transition-colors"
                     >
                       <span className="text-red-400">{param.icon}</span>
@@ -524,7 +516,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                       step={param.step}
                       className="w-full"
                     />
-                    
+
                     <Input
                       id={param.key}
                       type="number"
@@ -556,7 +548,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
               transition={{ delay: 0.6 }}
               className="pt-4 border-t border-gray-700/50 space-y-3"
             >
-              {/* Claude AI Analysis Button */}
+              {/* Gemini Analysis Button */}
               <Button
                 onClick={handleClaudeAnalyzeClick}
                 disabled={planet.isAnalyzing}
@@ -569,17 +561,12 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                 {planet.isAnalyzing ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                    <span className="animate-pulse">Claude AI Analyzing...</span>
+                    <span className="animate-pulse">Gemini Analyzing...</span>
                   </>
                 ) : (
                   <>
                     <Zap className="h-4 w-4 mr-2" />
-                    Analyze with Claude AI
-                    {userCredentials && (
-                      <Badge variant="outline" className="ml-2 border-green-400/50 text-green-400 bg-green-400/10 text-xs">
-                        ✓
-                      </Badge>
-                    )}
+                    Analyze with Gemini
                   </>
                 )}
               </Button>
@@ -610,10 +597,10 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
 
               {/* Info Text */}
               <div className="text-xs text-gray-500 text-center space-y-1 my-3">
-                             <p><strong>Claude AI:</strong> Advanced reasoning & scientific analysis</p>
-                             <p><strong>ML Model:</strong> Trained on K2 mission dataset patterns</p>
-                             <p className="flex "><AlertCircle className="h-3 w-3"/> AI models can make mistakes. Please review results carefully.</p>
-                           </div>
+                <p><strong>Gemini:</strong> Advanced reasoning & scientific analysis</p>
+                <p><strong>ML Model:</strong> Trained on K2 mission dataset patterns</p>
+                <p className="flex "><AlertCircle className="h-3 w-3" /> AI models can make mistakes. Please review results carefully.</p>
+              </div>
             </motion.div>
 
             {/* Planet Stats Summary */}
@@ -634,22 +621,22 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                 <div>
                   <div className="text-gray-400">Size Class</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_rade < 1.25 ? 'Earth-like' : 
-                     formData.pl_rade < 2 ? 'Super-Earth' : 'Gas Giant'}
+                    {formData.pl_rade < 1.25 ? 'Earth-like' :
+                      formData.pl_rade < 2 ? 'Super-Earth' : 'Gas Giant'}
                   </div>
                 </div>
                 <div>
                   <div className="text-gray-400">Orbit Type</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_orbper < 10 ? 'Ultra-Short' : 
-                     formData.pl_orbper < 100 ? 'Short' : 'Long'}
+                    {formData.pl_orbper < 10 ? 'Ultra-Short' :
+                      formData.pl_orbper < 100 ? 'Short' : 'Long'}
                   </div>
                 </div>
                 <div>
                   <div className="text-gray-400">Transit Signal</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_trandep > 0.001 ? 'Strong' : 
-                     formData.pl_trandep > 0.0001 ? 'Moderate' : 'Weak'}
+                    {formData.pl_trandep > 0.001 ? 'Strong' :
+                      formData.pl_trandep > 0.0001 ? 'Moderate' : 'Weak'}
                   </div>
                 </div>
               </div>
@@ -663,12 +650,12 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                 transition={{ delay: 1.0 }}
                 className="space-y-4"
               >
-                {/* Claude AI Results */}
+                {/* Gemini Results */}
                 {planet.claudeResponse && (
                   <div className="bg-gradient-to-br from-red-900/40 to-orange-900/40 rounded-xl p-4 border border-red-700/50">
                     <div className="flex items-center gap-2 mb-3">
                       <Zap className="h-4 w-4 text-red-400" />
-                      <h4 className="text-sm font-semibold text-red-300">Claude AI Analysis</h4>
+                      <h4 className="text-sm font-semibold text-red-300">Gemini Analysis</h4>
                     </div>
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between">
@@ -683,7 +670,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Confidence:</span>
-                        <span className="text-red-300 font-medium">{(planet.claudeResponse.confidence * 100).toFixed(1)}%</span>
+                        <span className="text-red-300 font-medium">{formatConfidencePercent(planet.claudeResponse.confidence)}</span>
                       </div>
                       {planet.claudeResponse.planet_type && (
                         <div className="flex justify-between">
