@@ -38,7 +38,7 @@ export interface PlanetData {
     status: string;
     timestamp: string;
   };
-  claudeResponse?: {
+  geminiResponse?: {
     disposition: string;
     confidence: number;
     reasoning: string;

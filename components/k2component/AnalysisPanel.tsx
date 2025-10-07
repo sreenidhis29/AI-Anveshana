@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import {
-  X,
-  Activity,
-  Globe,
-  Sun,
-  Thermometer,
+import { 
+  X, 
+  Activity, 
+  Globe, 
+  Sun, 
+  Thermometer, 
   Zap,
   Orbit,
   Gauge,
@@ -17,7 +17,12 @@ import {
   Compass,
   MapPin,
   Ruler,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Upload,
+  Table,
+  FileSpreadsheet,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -26,8 +31,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { K2PlanetData } from './K2Visualizer';
-import AWSCredentialsDialog from '@/components/ui/aws-credentials-dialog';
+import { ResultDialog } from '@/components/ui/result-dialog';
+import { toast } from 'sonner';
 
 interface AnalysisPanelProps {
   planet: K2PlanetData;
@@ -37,11 +44,6 @@ interface AnalysisPanelProps {
   onAnalyze: (planet: K2PlanetData) => void;
 }
 
-interface AWSCredentials {
-  aws_region: string;
-  aws_access_key_id: string;
-  aws_secret_access_key: string;
-}
 
 interface ParameterConfig {
   key: keyof K2PlanetData;
@@ -217,37 +219,40 @@ const parameters: ParameterConfig[] = [
   }
 ];
 
-export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPanelProps) {
-  const [formData, setFormData] = useState(planet);
-  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
-  const [userCredentials, setUserCredentials] = useState<AWSCredentials | null>(null);
-  const [hasEnvCredentials, setHasEnvCredentials] = useState(false);
-
-  const formatConfidencePercent = (value?: number) => {
-    if (value === undefined || value === null || isNaN(value)) return '—';
-    const pct = value <= 1 ? value * 100 : value;
-    return `${pct.toFixed(1)}%`;
-  };
+export default function AnalysisPanel({ planet,  onClose, onUpdate }: AnalysisPanelProps) {
+  const [formData, setFormData] = useState(() => ({
+    ...planet,
+    // Ensure all numeric values are defined with random values if undefined
+    pl_orbper: planet.pl_orbper ?? Math.random() * 50 + 1,
+    pl_trandep: planet.pl_trandep ?? Math.random() * 0.01 + 0.0001,
+    pl_trandur: planet.pl_trandur ?? Math.random() * 8 + 1,
+    pl_imppar: planet.pl_imppar ?? Math.random() * 0.8,
+    pl_rade: planet.pl_rade ?? Math.random() * 3 + 0.5,
+    pl_massj: planet.pl_massj ?? Math.random() * 2 + 0.001,
+    pl_dens: planet.pl_dens ?? Math.random() * 10 + 1,
+    pl_insol: planet.pl_insol ?? Math.random() * 1000 + 0.1,
+    pl_eqt: planet.pl_eqt ?? Math.random() * 1000 + 200,
+    st_teff: planet.st_teff ?? Math.random() * 2000 + 4000,
+    st_rad: planet.st_rad ?? Math.random() * 2 + 0.5,
+    st_mass: planet.st_mass ?? Math.random() * 1.5 + 0.5,
+    st_logg: planet.st_logg ?? Math.random() * 1.5 + 3.5,
+    ra: planet.ra ?? Math.random() * 360,
+    dec: planet.dec ?? Math.random() * 180 - 90,
+    sy_dist: planet.sy_dist ?? Math.random() * 1000 + 10,
+  }));
+  const [showResultDialog, setShowResultDialog] = useState(false);
+  
+  // CSV Upload States
+  const [csvData, setCsvData] = useState<Record<string, string>[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [selectedCsvRow, setSelectedCsvRow] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     setFormData(planet);
   }, [planet]);
 
-  useEffect(() => {
-    // Check if environment variables are available
-    const checkEnvironmentCredentials = async () => {
-      try {
-        const response = await fetch('/api/check-env');
-        const data = await response.json();
-        setHasEnvCredentials(data.hasEnvironmentCredentials);
-      } catch (error) {
-        console.error('Failed to check environment credentials:', error);
-        setHasEnvCredentials(false);
-      }
-    };
-
-    checkEnvironmentCredentials();
-  }, []);
 
   const handleInputChange = (key: keyof K2PlanetData, value: number) => {
     const newData = { ...formData, [key]: value };
@@ -276,12 +281,6 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         ra: formData.ra,
         dec: formData.dec,
         sy_dist: formData.sy_dist,
-        // Include user credentials if available
-        ...(userCredentials && {
-          aws_region: userCredentials.aws_region,
-          aws_access_key_id: userCredentials.aws_access_key_id,
-          aws_secret_access_key: userCredentials.aws_secret_access_key,
-        })
       };
 
       const response = await fetch('/api/predict-k2', {
@@ -295,12 +294,12 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error || `HTTP error! status: ${response.status}`;
-        console.error('Claude API Error:', errorMessage);
+        console.error('Gemini API Error:', errorMessage);
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
-
+      
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
       if (result.disposition === 'CONFIRMED') {
         prediction = 'confirmed';
@@ -310,10 +309,10 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         prediction = 'candidate';
       }
 
-      onUpdate({
-        isAnalyzing: false,
+      onUpdate({ 
+        isAnalyzing: false, 
         prediction: prediction,
-        claudeResponse: {
+        geminiResponse: {
           disposition: result.disposition,
           confidence: result.confidence,
           reasoning: result.reasoning,
@@ -322,48 +321,88 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         }
       });
 
+      // Show success toast
+      toast.success('Gemini AI Analysis Complete!', {
+        description: `Classification: ${result.disposition}`,
+        duration: 5000,
+      });
+
+      // Show result dialog
+      setShowResultDialog(true);
+
     } catch (error) {
       console.error('Analysis failed:', error);
       onUpdate({ isAnalyzing: false });
-
-      // Show user-friendly error message without auto-reopening dialog
+      
       const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+      
+      // Show error toast
       if (errorMessage.includes('credential') || errorMessage.includes('auth')) {
-        alert(`Claude AI Analysis Error: ${errorMessage}\n\nPlease click "Analyze with Claude AI" again to configure credentials.`);
+        toast.error('Authentication Error', {
+          description: 'Please configure your AWS credentials and try again.',
+          duration: 6000,
+        });
       } else {
-        alert(`Claude AI Analysis Error: ${errorMessage}`);
+        toast.error('Gemini AI Analysis Failed', {
+          description: errorMessage,
+          duration: 5000,
+        });
       }
     }
   };
 
-  const handleCredentialsSubmit = (credentials: AWSCredentials) => {
-    setUserCredentials(credentials);
-    setShowCredentialsDialog(false);
 
-    // Retry the analysis with the provided credentials
-    setTimeout(() => {
-      handleAnalyze();
-    }, 100);
-  };
-
-  const handleClaudeAnalyzeClick = () => {
-    // Gemini does not require AWS credentials; invoke directly
+  const handleGeminiAnalyzeClick = () => {
+    // Validation: If on CSV tab, must have a row selected
+    if (activeTab === 'csv' && selectedCsvRow === null) {
+      toast.error('No CSV Row Selected', {
+        description: 'Please select a row from the CSV table before analyzing.',
+        duration: 4000,
+      });
+      return;
+    }
+    
+    // Validation: If on CSV tab with selected row, ensure all parameters are present
+    if (activeTab === 'csv' && selectedCsvRow !== null) {
+      const row = csvData[selectedCsvRow];
+      const paramCheck = checkCsvParameters(row);
+      if (paramCheck.found !== paramCheck.total) {
+        toast.error('Incomplete Parameters', {
+          description: `Selected row is missing ${paramCheck.total - paramCheck.found} parameter(s). Cannot proceed with analysis.`,
+          duration: 5000,
+        });
+        return;
+      }
+    }
+    
+    // Proceed directly with Gemini analysis
     handleAnalyze();
   };
 
-  const handleCredentialsSkip = () => {
-    setShowCredentialsDialog(false);
-    // Proceed with environment variables
-    setTimeout(() => {
-      handleAnalyze();
-    }, 100);
-  };
-
-  const handleCredentialsClose = () => {
-    setShowCredentialsDialog(false);
-  };
 
   const handleFlaskAnalyze = async () => {
+    // Validation: If on CSV tab, must have a row selected
+    if (activeTab === 'csv' && selectedCsvRow === null) {
+      toast.error('No CSV Row Selected', {
+        description: 'Please select a row from the CSV table before analyzing.',
+        duration: 4000,
+      });
+      return;
+    }
+    
+    // Validation: If on CSV tab with selected row, ensure all parameters are present
+    if (activeTab === 'csv' && selectedCsvRow !== null) {
+      const row = csvData[selectedCsvRow];
+      const paramCheck = checkCsvParameters(row);
+      if (paramCheck.found !== paramCheck.total) {
+        toast.error('Incomplete Parameters', {
+          description: `Selected row is missing ${paramCheck.total - paramCheck.found} parameter(s). Cannot proceed with analysis.`,
+          duration: 5000,
+        });
+        return;
+      }
+    }
+    
     try {
       onUpdate({ isAnalyzing: true });
 
@@ -388,11 +427,11 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         }
       };
 
-      const response = await fetch('http://127.0.0.1:5000/predict/k2', {
+      const response = await fetch('https://ml-backend-1zgp.onrender.com/predict/k2', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-KEY': ''
+          'X-API-KEY': 'QzQBpd3vd1K4fBeRdPMBvH4rwphF7Nns4Y-T1cfj9PY'
         },
         body: JSON.stringify(payload),
       });
@@ -403,9 +442,9 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
       const result = await response.json();
       console.log('Flask API Response:', result);
-
+      
       let prediction: 'confirmed' | 'false-positive' | 'candidate';
-
+      
       if (result.archive_disposition === 'CONFIRMED') {
         prediction = 'confirmed';
       } else if (result.archive_disposition === 'FALSE POSITIVE') {
@@ -416,8 +455,8 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         prediction = 'candidate';
       }
 
-      onUpdate({
-        isAnalyzing: false,
+      onUpdate({ 
+        isAnalyzing: false, 
         prediction: prediction,
         flaskResponse: {
           archive_disposition: result.archive_disposition,
@@ -428,18 +467,157 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         }
       });
 
+      // Show success toast
+      toast.success('ML Model Analysis Complete!', {
+        description: `Classification: ${result.archive_disposition}`,
+        duration: 5000,
+      });
+
+      // Show result dialog
+      setShowResultDialog(true);
+
     } catch (error) {
       console.error('Flask analysis failed:', error);
       onUpdate({ isAnalyzing: false });
+      
+      const errorMessage = error instanceof Error ? error.message : 'Connection failed';
+      
+      // Show error toast
+      toast.error('Flask API Error', {
+        description: errorMessage + '. Make sure Flask server is running on http://127.0.0.1:5000',
+        duration: 6000,
+      });
+    }
+  };
 
-      alert(`Flask API Error: ${error instanceof Error ? error.message : 'Connection failed. Make sure Flask server is running on http://127.0.0.1:5000'}`);
+  // CSV Upload Handler
+  const handleCsvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      parseCSV(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) {
+      toast.error('Empty CSV file');
+      return;
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim());
+    const rows = lines.slice(1).map(line => {
+      const values = line.split(',').map(v => v.trim());
+      const row: Record<string, string> = {};
+      headers.forEach((header, index) => {
+        row[header] = values[index];
+      });
+      return row;
+    });
+
+    setCsvHeaders(headers);
+    setCsvData(rows);
+    setActiveTab('csv');
+    toast.success(`CSV loaded: ${rows.length} rows found`);
+  };
+
+  const handleSelectCsvRow = (index: number) => {
+    const row = csvData[index];
+    const paramCheck = checkCsvParameters(row);
+    
+    // Validate that ALL parameters are present
+    if (paramCheck.found !== paramCheck.total) {
+      toast.error('Incomplete Parameters', {
+        description: `This row is missing ${paramCheck.total - paramCheck.found} required parameter(s). Please select a row with all ${paramCheck.total} parameters.`,
+        duration: 5000,
+      });
+      return;
+    }
+    
+    setSelectedCsvRow(index);
+    
+    // Map CSV data to form data
+    const mappedData: Record<string, number> = {};
+    parameters.forEach(param => {
+      const value = parseFloat(row[param.key] || row[param.label] || '0');
+      if (!isNaN(value)) {
+        mappedData[param.key] = value;
+      }
+    });
+
+    // Update form data
+    setFormData(prev => ({ ...prev, ...mappedData }));
+    onUpdate(mappedData);
+    
+    toast.success(`Row ${index + 1} Selected`, {
+      description: `All ${paramCheck.total} parameters loaded successfully!`,
+      duration: 3000,
+    });
+  };
+
+  const getRequiredParameters = () => {
+    return parameters.map(p => p.key);
+  };
+
+  const checkCsvParameters = (row: Record<string, string>) => {
+    const required = getRequiredParameters();
+    const found = required.filter(key => 
+      row[key] !== undefined || row[parameters.find(p => p.key === key)?.label || ''] !== undefined
+    );
+    return { found: found.length, total: required.length };
+  };
+
+  // Drag and Drop Handlers
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files[0]) {
+      const file = files[0];
+      if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target?.result as string;
+          parseCSV(text);
+        };
+        reader.readAsText(file);
+      } else {
+        toast.error('Invalid file type', {
+          description: 'Please upload a CSV file',
+          duration: 3000,
+        });
+      }
     }
   };
 
   const getPredictionBadge = () => {
     if (planet.isAnalyzing) {
       return (
-        <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-400/30 animate-pulse">
+        <Badge variant="outline" className="border-blue-400/50 text-blue-400 bg-blue-400/10 animate-pulse">
           🔄 Analyzing...
         </Badge>
       );
@@ -447,7 +625,7 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
     if (planet.prediction === 'confirmed') {
       return (
-        <Badge variant="secondary" className="bg-green-500/20 text-green-300 border-green-400/30">
+        <Badge variant="outline" className="border-green-400/50 text-green-400 bg-green-400/10">
           ✅ Confirmed Exoplanet
         </Badge>
       );
@@ -455,7 +633,7 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
     if (planet.prediction === 'false-positive') {
       return (
-        <Badge variant="secondary" className="bg-red-500/20 text-red-300 border-red-400/30">
+        <Badge variant="outline" className="border-red-400/50 text-red-400 bg-red-400/10">
           ❌ False Positive
         </Badge>
       );
@@ -463,14 +641,14 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
     if (planet.prediction === 'candidate') {
       return (
-        <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300 border-yellow-400/30">
+        <Badge variant="outline" className="border-yellow-400/50 text-yellow-400 bg-yellow-400/10">
           🟡 Planet Candidate
         </Badge>
       );
     }
 
     return (
-      <Badge variant="secondary" className="bg-gray-500/20 text-gray-300 border-gray-400/30">
+      <Badge variant="outline" className="border-gray-400/50 text-gray-400 bg-gray-400/10">
         ⏳ Awaiting Analysis
       </Badge>
     );
@@ -481,9 +659,9 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
       initial={{ x: '100%', opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       exit={{ x: '100%', opacity: 0 }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
+      transition={{ 
+        type: 'spring', 
+        stiffness: 300, 
         damping: 30,
         opacity: { duration: 0.2 }
       }}
@@ -518,27 +696,26 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
             <div className="mt-4">
               {getPredictionBadge()}
-
-              {/* Credential Status */}
-              <div className="mt-2 flex items-center gap-2">
-                {userCredentials ? (
-                  <Badge variant="outline" className="border-green-400/50 text-green-400 bg-green-400/10 text-xs">
-                    🔐 Custom Credentials Set
-                  </Badge>
-                ) : hasEnvCredentials ? (
-                  <Badge variant="outline" className="border-blue-400/50 text-blue-400 bg-blue-400/10 text-xs">
-                    ⚡ Environment Variables Available
-                  </Badge>
-                ) : (
-                  <Badge variant="outline" className="border-yellow-400/50 text-yellow-400 bg-yellow-400/10 text-xs">
-                    ⚠️ Credentials Required
-                  </Badge>
-                )}
-              </div>
+              
             </div>
           </CardHeader>
 
           <CardContent className="space-y-6">
+            {/* Tabs for Manual / CSV Mode */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'manual' | 'csv')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-gray-800/80 to-gray-900/80 backdrop-blur-sm border border-gray-700/50">
+                <TabsTrigger value="manual" className="text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600/90 data-[state=active]:to-amber-600/90 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-orange-500/20 transition-all duration-300">
+                  <Activity className="h-4 w-4 mr-2" />
+                  Manual Input
+                </TabsTrigger>
+                <TabsTrigger value="csv" className="text-white data-[state=active]:bg-gradient-to-r data-[state=active]:from-orange-600/90 data-[state=active]:to-amber-600/90 data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-orange-500/20 transition-all duration-300">
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  CSV Upload
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Manual Input Tab */}
+              <TabsContent value="manual" className="space-y-4 mt-4">
             {/* Parameters Grid */}
             <div className="space-y-4">
               {parameters.map((param, index) => (
@@ -550,57 +727,329 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
                   className="group"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <Label
-                      htmlFor={param.key}
-                      className="text-sm font-medium text-gray-300 flex items-center gap-2 group-hover:text-white transition-colors"
+                    <Label 
+                      htmlFor={param.key} 
+                      className="text-sm font-medium text-gray-200 flex items-center gap-2 group-hover:text-white transition-colors duration-200"
                     >
-                      <span className="text-orange-400">{param.icon}</span>
+                      <span className="text-orange-400 group-hover:text-orange-300 transition-colors duration-200">{param.icon}</span>
                       {param.label}
                     </Label>
-                    <div className="text-xs text-gray-400 font-mono">
-                      {(formData[param.key] as number).toFixed(param.step < 0.1 ? 2 : 1)} {param.unit}
+                    <div className="text-xs text-gray-300 font-mono bg-gray-800/40 px-2 py-1 rounded border border-gray-700/50">
+                      {Number(formData[param.key] || 0).toFixed(param.step < 0.1 ? 2 : 1)} {param.unit}
                     </div>
                   </div>
 
                   <div className="space-y-2">
                     <Slider
-                      value={[(formData[param.key] as number)]}
+                      value={[Number(formData[param.key] || 0)]}
                       onValueChange={([value]) => handleInputChange(param.key, value)}
                       min={param.min}
                       max={param.max}
                       step={param.step}
                       className="w-full"
                     />
-
+                    
                     <Input
                       id={param.key}
                       type="number"
-                      value={(formData[param.key] as number)}
+                      value={Number(formData[param.key] || 0)}
                       onChange={(e) => handleInputChange(param.key, parseFloat(e.target.value) || 0)}
                       min={param.min}
                       max={param.max}
                       step={param.step}
-                      className="h-8 bg-gray-800/60 border-gray-600/50 text-white text-xs
-                        focus:border-orange-400 focus:ring-1 focus:ring-orange-400/20"
+                      className="h-8 bg-gradient-to-r from-gray-800/80 to-gray-900/80 border-gray-600/60 text-white text-xs
+                        focus:border-orange-400/80 focus:ring-2 focus:ring-orange-400/30 focus:bg-gradient-to-r focus:from-gray-700/80 focus:to-gray-800/80
+                        hover:border-orange-500/60 transition-all duration-200 backdrop-blur-sm"
                     />
                   </div>
 
-                  <p className="text-xs text-gray-500 mt-1 leading-tight">
+                  <p className="text-xs text-gray-400 mt-1 leading-tight bg-gray-800/30 px-3 py-2 rounded-lg border border-gray-700/30">
                     {param.description}
                   </p>
 
                   {index < parameters.length - 1 && (
-                    <Separator className="mt-4 bg-gray-700/50" />
+                    <Separator className="mt-4 bg-gradient-to-r from-transparent via-gray-600/40 to-transparent" />
                   )}
                 </motion.div>
               ))}
             </div>
+          </TabsContent>
+
+          {/* CSV Upload Tab */}
+          <TabsContent value="csv" className="space-y-4 mt-4">
+            {/* CSV Upload Section */}
+            <motion.div
+              onDragEnter={handleDragEnter}
+              onDragLeave={handleDragLeave}
+              onDragOver={handleDragOver}
+              onDrop={handleDrop}
+              animate={{
+                borderColor: isDragging ? 'rgb(234, 88, 12)' : 'rgb(75, 85, 99)',
+                backgroundColor: isDragging ? 'rgba(234, 88, 12, 0.1)' : 'rgba(0, 0, 0, 0)',
+                scale: isDragging ? 1.02 : 1,
+              }}
+              transition={{ duration: 0.2 }}
+              className={`relative border-2 border-dashed rounded-xl p-8 text-center overflow-hidden
+                ${isDragging ? 'border-orange-500 bg-gradient-to-br from-orange-500/20 to-amber-500/20' : 'border-gray-600/60 hover:border-orange-500/60 bg-gradient-to-br from-gray-800/40 to-gray-900/40'}
+                transition-all duration-300 cursor-pointer group backdrop-blur-sm`}
+            >
+              {/* Animated Background Effect */}
+              <div className="absolute inset-0 bg-gradient-to-br from-orange-600/5 via-transparent to-red-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              {/* Upload Icon with Animation */}
+              <motion.div
+                animate={{
+                  y: isDragging ? -10 : 0,
+                  scale: isDragging ? 1.1 : 1,
+                }}
+                transition={{ duration: 0.3 }}
+                className="relative z-10"
+              >
+                <div className="mx-auto w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-orange-600/30 to-amber-600/30 
+                  flex items-center justify-center border border-orange-500/40 group-hover:border-orange-400/60 transition-all duration-300 shadow-lg shadow-orange-500/20">
+                  <Upload className={`h-8 w-8 transition-colors duration-300 ${
+                    isDragging ? 'text-orange-400' : 'text-orange-500 group-hover:text-orange-400'
+                  }`} />
+                </div>
+
+                <Label htmlFor="csv-upload-k2" className="cursor-pointer relative z-10">
+                  <div className="space-y-2">
+                    <div className="text-base font-semibold text-white group-hover:text-orange-300 transition-colors">
+                      {isDragging ? (
+                        <span className="text-orange-400 flex items-center justify-center gap-2">
+                          <FileSpreadsheet className="h-5 w-5" />
+                          Drop your CSV file here
+                        </span>
+                      ) : (
+                        <>
+                          Drag & Drop CSV File
+                        </>
+                      )}
+                    </div>
+                    
+                    {!isDragging && (
+                      <>
+                        <div className="text-sm text-gray-400">
+                          or{' '}
+                          <span className="text-orange-400 hover:text-orange-300 font-medium underline underline-offset-2">
+                            browse files
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center justify-center gap-2 mt-3">
+                          <Badge variant="outline" className="border-gray-600 text-gray-400 bg-gray-800/50 text-xs">
+                            <FileSpreadsheet className="h-3 w-3 mr-1" />
+                            .csv files only
+                          </Badge>
+                          <Badge variant="outline" className="border-orange-600/50 text-orange-400 bg-orange-600/10 text-xs">
+                            <Activity className="h-3 w-3 mr-1" />
+                            {getRequiredParameters().length} parameters
+                          </Badge>
+                        </div>
+
+                        <div className="text-xs text-gray-400 mt-4 max-w-xs mx-auto">
+                          <div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 rounded-lg p-3 border border-gray-700/60 backdrop-blur-sm">
+                            <div className="font-medium text-gray-300 mb-1 flex items-center justify-center gap-1">
+                              <AlertCircle className="h-3 w-3 text-orange-400" />
+                              Required Parameters
+                            </div>
+                            <div className="text-gray-400 leading-relaxed">
+                              pl_orbper, pl_trandep, pl_rade, st_teff, st_mass, and 11 more...
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Label>
+
+                <Input
+                  id="csv-upload-k2"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvUpload}
+                  className="hidden"
+                />
+              </motion.div>
+
+              {/* Decorative Corner Elements */}
+              <div className="absolute top-2 left-2 w-6 h-6 border-l-2 border-t-2 border-orange-500/30 rounded-tl-lg" />
+              <div className="absolute top-2 right-2 w-6 h-6 border-r-2 border-t-2 border-orange-500/30 rounded-tr-lg" />
+              <div className="absolute bottom-2 left-2 w-6 h-6 border-l-2 border-b-2 border-orange-500/30 rounded-bl-lg" />
+              <div className="absolute bottom-2 right-2 w-6 h-6 border-r-2 border-b-2 border-orange-500/30 rounded-br-lg" />
+            </motion.div>
+
+            {/* CSV Data Table */}
+            {csvData.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+                className="space-y-3"
+              >
+                {/* Header Stats */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="border-orange-400/50 text-orange-300 bg-orange-400/10">
+                      <Table className="h-3 w-3 mr-1" />
+                      {csvData.length} {csvData.length === 1 ? 'row' : 'rows'} loaded
+                    </Badge>
+                    <Badge variant="outline" className="border-red-400/50 text-red-300 bg-red-400/10">
+                      <FileSpreadsheet className="h-3 w-3 mr-1" />
+                      {csvHeaders.length} columns
+                    </Badge>
+                  </div>
+                  
+                  {selectedCsvRow !== null && (
+                    <motion.div
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: 'spring', stiffness: 200 }}
+                    >
+                      <Badge variant="outline" className="border-green-400/50 text-green-300 bg-green-400/10">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Row {selectedCsvRow + 1} selected
+                      </Badge>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Data Table */}
+                <div className="relative rounded-lg border border-gray-700/60 bg-gradient-to-br from-gray-900/50 to-gray-800/50 backdrop-blur-sm overflow-hidden shadow-lg">
+                  {/* Table Header - Sticky */}
+                  <div className="bg-gradient-to-r from-gray-800/95 to-gray-900/95 backdrop-blur-md border-b border-gray-700/60 sticky top-0 z-10">
+                    <div className="grid grid-cols-12 gap-2 px-3 py-3 text-xs font-semibold text-gray-300">
+                      <div className="col-span-1 text-center">#</div>
+                      <div className="col-span-5">Parameters Preview</div>
+                      <div className="col-span-3 text-center">Match Status</div>
+                      <div className="col-span-3 text-center">Action</div>
+                    </div>
+                  </div>
+
+                  {/* Table Body - Scrollable */}
+                  <div className="max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-orange-600/50 scrollbar-track-gray-800/50">
+                    {csvData.map((row, index) => {
+                      const paramCheck = checkCsvParameters(row);
+                      const matchPercentage = Math.round((paramCheck.found / paramCheck.total) * 100);
+                      const isSelected = selectedCsvRow === index;
+
+                      return (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
+                          className={`grid grid-cols-12 gap-2 px-3 py-3 text-xs border-t border-gray-700/40 
+                            transition-all duration-200 hover:bg-gradient-to-r hover:from-orange-600/10 hover:to-amber-600/10
+                            ${isSelected ? 'bg-gradient-to-r from-orange-600/20 to-amber-600/20 border-orange-500/40' : ''}`}
+                        >
+                          {/* Row Number */}
+                          <div className="col-span-1 text-center">
+                            <div className={`inline-flex items-center justify-center w-6 h-6 rounded-full 
+                              ${isSelected ? 'bg-gradient-to-br from-orange-600 to-amber-600 text-white shadow-lg shadow-orange-500/30' : 'bg-gray-700/60 text-gray-300'}`}>
+                              {index + 1}
+                            </div>
+                          </div>
+
+                          {/* Parameters Preview */}
+                          <div className="col-span-5 text-gray-300">
+                            <div className="space-y-1">
+                              {Object.entries(row).slice(0, 2).map(([key, value], i) => (
+                                <div key={i} className="flex items-center gap-1 truncate">
+                                  <span className="text-gray-500 text-[10px]">{key}:</span>
+                                  <span className="text-gray-300 font-mono text-[10px]">{String(value)}</span>
+                                </div>
+                              ))}
+                              {Object.keys(row).length > 2 && (
+                                <span className="text-gray-500 text-[10px]">+{Object.keys(row).length - 2} more...</span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Match Status */}
+                          <div className="col-span-3 flex items-center justify-center">
+                            <div className="space-y-1 text-center">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${
+                                  matchPercentage === 100
+                                    ? 'border-green-400/50 text-green-300 bg-green-400/10'
+                                    : matchPercentage >= 70
+                                    ? 'border-yellow-400/50 text-yellow-300 bg-yellow-400/10'
+                                    : 'border-red-400/50 text-red-300 bg-red-400/10'
+                                }`}
+                              >
+                                {paramCheck.found}/{paramCheck.total}
+                              </Badge>
+                              <div className="text-[10px] text-gray-500">
+                                {matchPercentage}% match
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div className="col-span-3 flex items-center justify-center">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSelectCsvRow(index)}
+                              disabled={matchPercentage !== 100}
+                              className={`h-7 text-xs transition-all duration-200 ${
+                                isSelected
+                                  ? 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white border-orange-400/60 shadow-lg shadow-orange-500/20'
+                                  : matchPercentage === 100
+                                  ? 'bg-gradient-to-r from-gray-700/60 to-gray-800/60 hover:from-orange-600/20 hover:to-amber-600/20 text-gray-200 hover:text-orange-200 border-gray-600/60 hover:border-orange-500/60'
+                                  : 'bg-gradient-to-r from-gray-800/60 to-gray-900/60 text-gray-500 border-gray-700/60 cursor-not-allowed opacity-50'
+                              }`}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Selected
+                                </>
+                              ) : matchPercentage === 100 ? (
+                                <>
+                                  <Activity className="h-3 w-3 mr-1" />
+                                  Select
+                                </>
+                              ) : (
+                                <>
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  Incomplete
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Clear CSV Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCsvData([]);
+                    setCsvHeaders([]);
+                    setSelectedCsvRow(null);
+                    toast.success('CSV data cleared');
+                  }}
+                  className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-400 border-red-600/30 hover:border-red-500/50"
+                >
+                  <X className="h-3 w-3 mr-2" />
+                  Clear CSV Data
+                </Button>
+              </motion.div>
+            )}
+          </TabsContent>
+        </Tabs>
 
             {/* Analysis Actions */}
             <div className="space-y-3">
               <Button
-                onClick={handleClaudeAnalyzeClick}
-                disabled={planet.isAnalyzing}
+                onClick={handleGeminiAnalyzeClick}
+                disabled={planet.isAnalyzing || (activeTab === 'csv' && selectedCsvRow === null)}
                 className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 
                   text-white font-medium py-2.5 rounded-lg transition-all duration-200 
                   disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
@@ -608,19 +1057,21 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
                 {planet.isAnalyzing ? (
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Analyzing with Gemini...</span>
+                    <span>Analyzing with Gemini..</span>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center gap-2">
                     <Zap className="h-4 w-4" />
-                    <span>Analyze with Gemini</span>
+                    <span>{activeTab === 'csv' && selectedCsvRow === null 
+                      ? 'Select CSV Row to Analyze'
+                      : 'Analyze with Gemini AI'}</span>
                   </div>
                 )}
               </Button>
 
               <Button
                 onClick={handleFlaskAnalyze}
-                disabled={planet.isAnalyzing}
+                disabled={planet.isAnalyzing || (activeTab === 'csv' && selectedCsvRow === null)}
                 variant="outline"
                 className="w-full bg-white hover:bg-white border-orange-500 text-orange-300 
                   hover:border-orange-400 font-medium py-2.5 rounded-lg transition-all duration-200
@@ -634,102 +1085,52 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
                 ) : (
                   <div className="flex items-center justify-center gap-2">
                     <Activity className="h-4 w-4" />
-                    <span>Analyze with ML Model</span>
+                    <span>{activeTab === 'csv' && selectedCsvRow === null 
+                      ? 'Select CSV Row to Analyze'
+                      : 'Analyze with ML Model'}</span>
                   </div>
                 )}
               </Button>
 
+              {(planet.geminiResponse || planet.flaskResponse) && (
+                <Button
+                  onClick={() => setShowResultDialog(true)}
+                  variant="outline"
+                  className="w-full mt-2 bg-gradient-to-r from-purple-600/20 to-pink-600/20 
+                    hover:from-purple-600/30 hover:to-pink-600/30 
+                    text-purple-300 h-10 font-medium shadow-lg shadow-purple-600/20 
+                    transition-all duration-300
+                    border border-purple-500/30 hover:border-purple-400/50"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  View Detailed Results
+                </Button>
+              )}
+              
               {/* Info Text */}
               <div className="text-xs text-gray-500 text-center space-y-1 my-3">
                 <p><strong>Gemini:</strong> Advanced reasoning & scientific analysis</p>
                 <p><strong>ML Model:</strong> Trained on K2 mission dataset patterns</p>
-                <p className="flex "><AlertCircle className="h-3 w-3" /> AI models can make mistakes. Please review results carefully.</p>
+                <p className="flex "><AlertCircle className="h-3 w-3"/> AI models can make mistakes. Please review results carefully.</p>
               </div>
+
+              {/* View Results Button - Show when there are results */}
+              
             </div>
 
-            {/* Analysis Results */}
-            {(planet.claudeResponse || planet.flaskResponse) && (
-              <Card className="bg-gray-800/50 border-gray-700/50">
-                <CardHeader>
-                  <CardTitle className="text-sm text-gray-300">Analysis Results</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {planet.claudeResponse && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-blue-400" />
-                        <span className="text-sm font-medium text-blue-300">Gemini Analysis</span>
-                      </div>
-                      <div className="pl-6 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Is Exoplanet:</span>
-                          <span className={`font-medium ${planet.claudeResponse.disposition === 'FALSE POSITIVE' ? 'text-red-300' : 'text-green-300'}`}>
-                            {planet.claudeResponse.disposition === 'FALSE POSITIVE' ? '❌ No' : '✅ Yes'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Disposition:</span>
-                          <span className="text-blue-300">{planet.claudeResponse.disposition}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Confidence:</span>
-                          <span className="text-blue-300">{formatConfidencePercent(planet.claudeResponse.confidence)}</span>
-                        </div>
-                        {planet.claudeResponse.planet_type && (
-                          <div className="flex justify-between">
-                            <span className="text-gray-400">Type:</span>
-                            <span className="text-blue-300">{planet.claudeResponse.planet_type}</span>
-                          </div>
-                        )}
-                        {planet.claudeResponse.reasoning && (
-                          <div className="mt-2">
-                            <span className="text-gray-400 text-xs">Reasoning:</span>
-                            <p className="text-blue-200 text-xs mt-1 p-2 bg-blue-900/20 rounded border border-blue-800/30">
-                              {planet.claudeResponse.reasoning}
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {planet.flaskResponse && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Activity className="h-4 w-4 text-green-400" />
-                        <span className="text-sm font-medium text-green-300">ML Model Analysis</span>
-                      </div>
-                      <div className="pl-6 space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Disposition:</span>
-                          <span className="text-green-300">{planet.flaskResponse.archive_disposition}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Planet Type:</span>
-                          <span className="text-green-300">{planet.flaskResponse.planet_type}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Probability:</span>
-                          <span className="text-green-300">{(planet.flaskResponse.probability * 100).toFixed(1)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* AWS Credentials Dialog */}
-      <AWSCredentialsDialog
-        open={showCredentialsDialog}
-        onClose={handleCredentialsClose}
-        onSubmit={handleCredentialsSubmit}
-        onSkip={handleCredentialsSkip}
-        canSkip={hasEnvCredentials}
-        isLoading={planet.isAnalyzing}
+
+      {/* Result Dialog */}
+      <ResultDialog
+        open={showResultDialog}
+        onOpenChange={setShowResultDialog}
+        geminiResponse={planet.geminiResponse}
+        flaskResponse={planet.flaskResponse}
+        prediction={planet.prediction}
+        planetName={planet.id}
       />
     </motion.div>
   );

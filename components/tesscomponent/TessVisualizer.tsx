@@ -38,7 +38,7 @@ export interface TessPlanetData {
     status: string;
     timestamp: string;
   };
-  claudeResponse?: {
+  geminiResponse?: {
     disposition: string;
     confidence: number;
     reasoning: string;

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { TessPlanetData } from './TessVisualizer';
+import { ResultDialog } from '@/components/ui/result-dialog';
 import AWSCredentialsDialog from '@/components/ui/aws-credentials-dialog';
 
 interface AnalysisPanelProps {
@@ -176,6 +177,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
   const [userCredentials, setUserCredentials] = useState<AWSCredentials | null>(null);
   const [hasEnvCredentials, setHasEnvCredentials] = useState(false);
+  const [showResultDialog, setShowResultDialog] = useState(false);
 
   const formatConfidencePercent = (value?: number) => {
     if (value === undefined || value === null || isNaN(value)) return '—';
@@ -266,7 +268,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
       onUpdate({
         isAnalyzing: false,
         prediction: prediction,
-        claudeResponse: {
+        geminiResponse: {
           disposition: result.disposition,
           confidence: result.confidence,
           reasoning: result.reasoning,
@@ -274,6 +276,9 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
           planet_type: result.planet_type
         }
       });
+
+      // Show result dialog
+      setShowResultDialog(true);
 
     } catch (error) {
       console.error('Analysis failed:', error);
@@ -290,7 +295,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
     setTimeout(() => handleAnalyze(), 100);
   };
 
-  const handleClaudeAnalyzeClick = () => {
+  const handleGeminiAnalyzeClick = () => {
     // Gemini does not require AWS credentials; invoke directly
     handleAnalyze();
   };
@@ -372,6 +377,9 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
           timestamp: new Date().toISOString()
         }
       });
+
+      // Show result dialog
+      setShowResultDialog(true);
 
     } catch (error) {
       console.error('Flask analysis failed:', error);
@@ -550,7 +558,7 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
             >
               {/* Gemini Analysis Button */}
               <Button
-                onClick={handleClaudeAnalyzeClick}
+                onClick={handleGeminiAnalyzeClick}
                 disabled={planet.isAnalyzing}
                 className="w-full bg-gradient-to-r from-red-600 via-red-700 to-orange-700 
                   hover:from-red-700 hover:via-red-800 hover:to-orange-800 
@@ -642,90 +650,40 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
               </div>
             </motion.div>
 
-            {/* Analysis Results */}
-            {(planet.claudeResponse || planet.flaskResponse) && (
+            {/* View Results Button - Show when there are results */}
+            {(planet.geminiResponse || planet.flaskResponse) && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.0 }}
                 className="space-y-4"
               >
-                {/* Gemini Results */}
-                {planet.claudeResponse && (
-                  <div className="bg-gradient-to-br from-red-900/40 to-orange-900/40 rounded-xl p-4 border border-red-700/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Zap className="h-4 w-4 text-red-400" />
-                      <h4 className="text-sm font-semibold text-red-300">Gemini Analysis</h4>
-                    </div>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Is Exoplanet:</span>
-                        <span className={`font-medium ${planet.claudeResponse.is_exoplanet ? 'text-green-300' : 'text-red-300'}`}>
-                          {planet.claudeResponse.is_exoplanet ? '✅ Yes' : '❌ No'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">TESS Disposition:</span>
-                        <span className="text-red-300 font-medium">{getTessDispositionName(planet.claudeResponse.disposition)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Confidence:</span>
-                        <span className="text-red-300 font-medium">{formatConfidencePercent(planet.claudeResponse.confidence)}</span>
-                      </div>
-                      {planet.claudeResponse.planet_type && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Planet Type:</span>
-                          <span className="text-red-300 font-medium">{planet.claudeResponse.planet_type}</span>
-                        </div>
-                      )}
-                      {planet.claudeResponse.reasoning && (
-                        <div className="mt-2">
-                          <span className="text-gray-400">Analysis:</span>
-                          <p className="text-red-200 text-xs mt-1 leading-tight">{planet.claudeResponse.reasoning}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Flask ML Results */}
-                {planet.flaskResponse && (
-                  <div className="bg-gradient-to-br from-orange-900/40 to-yellow-900/40 rounded-xl p-4 border border-orange-700/50">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Activity className="h-4 w-4 text-orange-400" />
-                      <h4 className="text-sm font-semibold text-orange-300">ML Model Analysis</h4>
-                    </div>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">TFOPWG Disposition:</span>
-                        <span className="text-orange-300 font-medium">{planet.flaskResponse.tfopwg_disp}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Probability:</span>
-                        <span className="text-orange-300 font-medium">{(planet.flaskResponse.probability * 100).toFixed(1)}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Planet Type:</span>
-                        <span className="text-orange-300 font-medium">{planet.flaskResponse.planet_type}</span>
-                      </div>
-                      {planet.flaskResponse.tfopwg_disp_explanation && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-400">Explanation:</span>
-                          <p className="text-orange-200 text-xs mt-1 leading-tight">{planet.flaskResponse.tfopwg_disp_explanation}</p>
-                        </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Analyzed:</span>
-                        <span className="text-orange-300 font-medium">{new Date(planet.flaskResponse.timestamp).toLocaleTimeString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                <Button
+                  onClick={() => setShowResultDialog(true)}
+                  variant="outline"
+                  className="w-full bg-gradient-to-r from-purple-600/20 to-pink-600/20 
+                    hover:from-purple-600/30 hover:to-pink-600/30 
+                    text-purple-300 hover:text-purple-200 border-purple-500/50 hover:border-purple-400/70
+                    transition-all duration-200 shadow-lg hover:shadow-purple-500/20"
+                >
+                  <Activity className="h-4 w-4 mr-2" />
+                  View Analysis Results
+                </Button>
               </motion.div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Result Dialog */}
+      <ResultDialog
+        open={showResultDialog}
+        onOpenChange={setShowResultDialog}
+        geminiResponse={planet.geminiResponse}
+        flaskResponse={planet.flaskResponse}
+        prediction={planet.prediction}
+        planetName={planet.id}
+      />
 
       {/* AWS Credentials Dialog */}
       <AWSCredentialsDialog

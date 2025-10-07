@@ -103,12 +103,21 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
     console.log('Gemini K2 Analysis:', responseText);
 
     try {
-
-      const analysisResult = JSON.parse(responseText);
+      // Clean the response text to extract JSON from markdown code blocks
+      let cleanedResponse = responseText.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      const analysisResult = JSON.parse(cleanedResponse);
 
 
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
-        throw new Error('Invalid response format from Claude');
+        throw new Error('Invalid response format from Gemini');
       }
 
 
@@ -149,8 +158,8 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
       });
 
     } catch (parseError) {
-      console.error('Error parsing Claude response:', parseError);
-      console.log('Raw Claude response:', responseText);
+      console.error('Error parsing Gemini response:', parseError);
+      console.log('Raw Gemini response:', responseText);
 
 
       const disposition = responseText.toLowerCase().includes('confirmed') ? 'CONFIRMED' :
@@ -202,7 +211,7 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
     if (error instanceof Error && error.message.includes('access')) {
       return NextResponse.json(
         {
-          error: 'Claude model access denied. Please check your AWS Bedrock permissions.',
+          error: 'Gemini model access denied. Please check your API permissions.',
           success: false
         },
         { status: 403 }
@@ -211,7 +220,7 @@ Based on your scientific analysis of these K2 mission parameters, what is your a
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to get K2 prediction from Claude AI',
+        error: error instanceof Error ? error.message : 'Failed to get K2 prediction from Gemini AI',
         success: false
       },
       { status: 500 }

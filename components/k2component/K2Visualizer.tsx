@@ -40,7 +40,7 @@ export interface K2PlanetData {
     status: string;
     timestamp: string;
   };
-  claudeResponse?: {
+  geminiResponse?: {
     disposition: string;
     confidence: number;
     reasoning: string;

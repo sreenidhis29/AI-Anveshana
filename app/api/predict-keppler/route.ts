@@ -76,10 +76,20 @@ Based on the scientific analysis of these parameters, what is your assessment? C
     console.log('Gemini Analysis:', responseText);
 
     try {
-      const analysisResult = JSON.parse(responseText);
+      // Clean the response text to extract JSON from markdown code blocks
+      let cleanedResponse = responseText.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      const analysisResult = JSON.parse(cleanedResponse);
 
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
-        throw new Error('Invalid response format from Claude');
+        throw new Error('Invalid response format from Gemini');
       }
 
       const validDispositions = ['CONFIRMED', 'CANDIDATE', 'FALSE POSITIVE'];
@@ -117,7 +127,7 @@ Based on the scientific analysis of these parameters, what is your assessment? C
 
     } catch (parseError) {
       console.error('Error parsing Gemini response:', parseError);
-      console.log('Raw Claude response:', responseText);
+      console.log('Raw Gemini response:', responseText);
 
 
       const disposition = responseText.toLowerCase().includes('confirmed') ? 'CONFIRMED' :

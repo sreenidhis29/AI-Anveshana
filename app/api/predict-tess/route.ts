@@ -135,12 +135,21 @@ Based on your scientific analysis of these TESS mission parameters, what is your
     console.log('📝 Gemini response preview:', responseText.substring(0, 200) + '...');
 
     try {
-
-      const analysisResult = JSON.parse(responseText);
+      // Clean the response text to extract JSON from markdown code blocks
+      let cleanedResponse = responseText.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      const analysisResult = JSON.parse(cleanedResponse);
 
 
       if (!analysisResult.disposition || !analysisResult.confidence || !analysisResult.reasoning) {
-        throw new Error('Invalid response format from Claude');
+        throw new Error('Invalid response format from Gemini');
       }
 
 
@@ -178,7 +187,7 @@ Based on your scientific analysis of these TESS mission parameters, what is your
 
     } catch (parseError) {
       console.error('Error parsing Gemini response:', parseError);
-      console.log('Raw Claude response:', responseText);
+      console.log('Raw Gemini response:', responseText);
 
 
       let disposition = 'PC';
@@ -238,7 +247,7 @@ Based on your scientific analysis of these TESS mission parameters, what is your
     if (error instanceof Error && error.message.includes('access')) {
       return NextResponse.json(
         {
-          error: 'Claude model access denied. Please check your AWS Bedrock permissions.',
+          error: 'Gemini model access denied. Please check your API permissions.',
           success: false
         },
         { status: 403 }
@@ -247,7 +256,7 @@ Based on your scientific analysis of these TESS mission parameters, what is your
 
     return NextResponse.json(
       {
-        error: error instanceof Error ? error.message : 'Failed to get TESS prediction from Claude AI',
+        error: error instanceof Error ? error.message : 'Failed to get TESS prediction from Gemini AI',
         success: false
       },
       { status: 500 }
