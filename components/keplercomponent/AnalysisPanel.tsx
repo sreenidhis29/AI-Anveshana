@@ -35,17 +35,17 @@ interface ParameterConfig {
 
 const parameters: ParameterConfig[] = [
   {
-    key: 'pl_orbper',
+    key: 'koi_period',
     label: 'Orbital Period',
     icon: <Orbit className="h-4 w-4" />,
     min: 0.5,
     max: 100,
     step: 0.1,
     unit: 'days',
-    description: 'Orbital Period. TESS is optimized for shorter periods.'
+    description: 'Orbital Period. Kepler is optimized for longer periods.'
   },
   {
-    key: 'pl_trandurh',
+    key: 'koi_duration',
     label: 'Transit Duration',
     icon: <Activity className="h-4 w-4" />,
     min: 0.5,
@@ -55,7 +55,7 @@ const parameters: ParameterConfig[] = [
     description: 'Transit Duration in hours'
   },
   {
-    key: 'pl_trandep',
+    key: 'koi_depth',
     label: 'Transit Depth',
     icon: <Zap className="h-4 w-4" />,
     min: 0.00001,
@@ -65,7 +65,7 @@ const parameters: ParameterConfig[] = [
     description: 'Transit Depth as fraction or ppm'
   },
   {
-    key: 'pl_rade',
+    key: 'koi_prad',
     label: 'Planet Radius',
     icon: <Globe className="h-4 w-4" />,
     min: 0.5,
@@ -75,7 +75,7 @@ const parameters: ParameterConfig[] = [
     description: 'Planet Radius in Earth radii'
   },
   {
-    key: 'pl_insol',
+    key: 'koi_insol',
     label: 'Incident Stellar Flux',
     icon: <Sun className="h-4 w-4" />,
     min: 0.1,
@@ -85,7 +85,7 @@ const parameters: ParameterConfig[] = [
     description: 'Incident Stellar Flux received by planet'
   },
   {
-    key: 'pl_eqt',
+    key: 'koi_teq',
     label: 'Equilibrium Temperature',
     icon: <Thermometer className="h-4 w-4" />,
     min: 100,
@@ -95,7 +95,7 @@ const parameters: ParameterConfig[] = [
     description: 'Planet Equilibrium Temperature'
   },
   {
-    key: 'st_teff',
+    key: 'koi_steff',
     label: 'Stellar Temperature',
     icon: <Thermometer className="h-4 w-4" />,
     min: 3000,
@@ -105,7 +105,7 @@ const parameters: ParameterConfig[] = [
     description: 'Star\'s Effective Temperature'
   },
   {
-    key: 'st_logg',
+    key: 'koi_slogg',
     label: 'Stellar Surface Gravity',
     icon: <Activity className="h-4 w-4" />,
     min: 3.0,
@@ -115,7 +115,7 @@ const parameters: ParameterConfig[] = [
     description: 'Star\'s Surface Gravity (logarithmic)'
   },
   {
-    key: 'st_rad',
+    key: 'koi_srad',
     label: 'Stellar Radius',
     icon: <Sun className="h-4 w-4" />,
     min: 0.3,
@@ -125,64 +125,75 @@ const parameters: ParameterConfig[] = [
     description: 'Star\'s Radius in Solar radii'
   },
   {
-    key: 'st_tmag',
-    label: 'TESS Magnitude',
+    key: 'koi_score',
+    label: 'KOI Score',
     icon: <Satellite className="h-4 w-4" />,
-    min: 4.0,
-    max: 18.0,
-    step: 0.1,
-    unit: 'mag',
+    min: 0.0,
+    max: 1.0,
+    step: 0.01,
+    unit: 'score',
     description: 'TESS Magnitude (brightness in TESS bandpass)'
   },
   {
-    key: 'st_dist',
-    label: 'System Distance',
+    key: 'koi_impact',
+    label: 'Impact Parameter',
     icon: <Satellite className="h-4 w-4" />,
-    min: 1,
-    max: 500,
-    step: 0.1,
-    unit: 'pc',
-    description: 'Distance to star system in parsecs'
-  },
-  {
-    key: 'ra',
-    label: 'Right Ascension',
-    icon: <Globe className="h-4 w-4" />,
     min: 0,
-    max: 360,
-    step: 0.1,
-    unit: '°',
-    description: 'Right Ascension coordinate'
+    max: 1,
+    step: 0.01,
+    unit: 'b',
+    description: 'Impact parameter (0 = central transit, 1 = grazing)'
   },
   {
-    key: 'dec',
-    label: 'Declination',
-    icon: <Globe className="h-4 w-4" />,
-    min: -90,
-    max: 90,
+    key: 'koi_time0bk',
+    label: 'Transit Epoch',
+    icon: <Activity className="h-4 w-4" />,
+    min: 0,
+    max: 1000,
     step: 0.1,
-    unit: '°',
-    description: 'Declination coordinate'
-  }
+    unit: 'days',
+    description: 'Time of first transit (BJD - 2454833)'
+  },
+  {
+    key: 'koi_model_snr',
+    label: 'Model SNR',
+    icon: <Zap className="h-4 w-4" />,
+    min: 0,
+    max: 100,
+    step: 0.1,
+    unit: 'SNR',
+    description: 'Signal-to-noise ratio of the transit model'
+  },
+  {
+    key: 'koi_srho',
+    label: 'Stellar Density',
+    icon: <Sun className="h-4 w-4" />,
+    min: 0.1,
+    max: 100,
+    step: 0.1,
+    unit: 'g/cm³',
+    description: 'Stellar density from transit fit'
+  },
 ];
 
 export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPanelProps) {
   const [formData, setFormData] = useState(() => ({
     ...planet,
     // Ensure all numeric values are defined with random values if undefined
-    pl_orbper: planet.pl_orbper ?? Math.random() * 50 + 1,
-    pl_trandurh: planet.pl_trandurh ?? Math.random() * 8 + 1,
-    pl_trandep: planet.pl_trandep ?? Math.random() * 0.01 + 0.0001,
-    pl_rade: planet.pl_rade ?? Math.random() * 3 + 0.5,
-    pl_insol: planet.pl_insol ?? Math.random() * 1000 + 0.1,
-    pl_eqt: planet.pl_eqt ?? Math.random() * 1000 + 200,
-    st_teff: planet.st_teff ?? Math.random() * 2000 + 4000,
-    st_logg: planet.st_logg ?? Math.random() * 1.5 + 3.5,
-    st_rad: planet.st_rad ?? Math.random() * 2 + 0.5,
-    st_tmag: planet.st_tmag ?? Math.random() * 10 + 5,
-    st_dist: planet.st_dist ?? Math.random() * 200 + 10,
-    ra: planet.ra ?? Math.random() * 360,
-    dec: planet.dec ?? Math.random() * 180 - 90,
+    koi_period: planet.koi_period ?? Math.random() * 50 + 1,
+    koi_duration: planet.koi_duration ?? Math.random() * 8 + 1,
+    koi_depth: planet.koi_depth ?? Math.random() * 0.01 + 0.0001,
+    koi_prad: planet.koi_prad ?? Math.random() * 3 + 0.5,
+    koi_insol: planet.koi_insol ?? Math.random() * 1000 + 0.1,
+    koi_teq: planet.koi_teq ?? Math.random() * 1000 + 200,
+    koi_steff: planet.koi_steff ?? Math.random() * 2000 + 4000,
+    koi_slogg: planet.koi_slogg ?? Math.random() * 1.5 + 3.5,
+    koi_srad: planet.koi_srad ?? Math.random() * 2 + 0.5,
+    koi_score: planet.koi_score ?? Math.random() * 0.5 + 0.5,
+    koi_impact: planet.koi_impact ?? Math.random() * 0.5 + 0.25,
+    koi_time0bk: planet.koi_time0bk ?? Math.random() * 100 + 10,
+    koi_model_snr: planet.koi_model_snr ?? Math.random() * 50 + 5,
+    koi_srho: planet.koi_srho ?? Math.random() * 10 + 1,
   }));
   const [showResultDialog, setShowResultDialog] = useState(false);
   
@@ -198,7 +209,7 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
   }, [planet]);
 
 
-  const handleInputChange = (key: keyof TessPlanetData, value: number) => {
+  const handleInputChange = (key: keyof PlanetData, value: number) => {
     const newData = { ...formData, [key]: value };
     setFormData(newData);
     onUpdate({ [key]: value });
@@ -220,19 +231,20 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
       onUpdate({ isAnalyzing: true });
 
       const payload = {
-        pl_orbper: formData.pl_orbper,
-        pl_trandurh: formData.pl_trandurh,
-        pl_trandep: formData.pl_trandep,
-        pl_rade: formData.pl_rade,
-        pl_insol: formData.pl_insol,
-        pl_eqt: formData.pl_eqt,
-        st_teff: formData.st_teff,
-        st_logg: formData.st_logg,
-        st_rad: formData.st_rad,
-        st_tmag: formData.st_tmag,
-        st_dist: formData.st_dist,
-        ra: formData.ra,
-        dec: formData.dec,
+        koi_period: formData.koi_period,
+        koi_duration: formData.koi_duration,
+        koi_depth: formData.koi_depth,
+        koi_prad: formData.koi_prad,
+        koi_insol: formData.koi_insol,
+        koi_teq: formData.koi_teq,
+        koi_steff: formData.koi_steff,
+        koi_slogg: formData.koi_slogg,
+        koi_srad: formData.koi_srad,
+        koi_score: formData.koi_score,
+        koi_impact: formData.koi_impact,
+        koi_time0bk: formData.koi_time0bk,
+        koi_model_snr: formData.koi_model_snr,
+        koi_srho: formData.koi_srho,
       };
 
       const response = await fetch('/api/predict-tess', {
@@ -360,19 +372,20 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
       const payload = {
         features: {
-          pl_orbper: formData.pl_orbper,
-          pl_trandurh: formData.pl_trandurh,
-          pl_trandep: formData.pl_trandep,
-          pl_rade: formData.pl_rade,
-          pl_insol: formData.pl_insol,
-          pl_eqt: formData.pl_eqt,
-          st_teff: formData.st_teff,
-          st_logg: formData.st_logg,
-          st_rad: formData.st_rad,
-          st_tmag: formData.st_tmag,
-          st_dist: formData.st_dist,
-          ra: formData.ra,
-          dec: formData.dec,
+          koi_period: formData.koi_period,
+          koi_duration: formData.koi_duration,
+          koi_depth: formData.koi_depth,
+          koi_prad: formData.koi_prad,
+          koi_insol: formData.koi_insol,
+          koi_teq: formData.koi_teq,
+          koi_steff: formData.koi_steff,
+          koi_slogg: formData.koi_slogg,
+          koi_srad: formData.koi_srad,
+          koi_score: formData.koi_score,
+          koi_impact: formData.koi_impact,
+          koi_time0bk: formData.koi_time0bk,
+          koi_model_snr: formData.koi_model_snr,
+          koi_srho: formData.koi_srho,
         }
       };
 
@@ -413,9 +426,8 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         isAnalyzing: false, 
         prediction: prediction,
         flaskResponse: {
-          tfopwg_disp: result.tfopwg_disp,
-          tfopwg_disp_explanation: result.tfopwg_disp_explanation,
-          planet_type: result.planet_type,
+          is_exoplanet: result.is_exoplanet,
+          koi_pdisposition: result.koi_pdisposition,
           probability: result.probability,
           status: 'success',
           timestamp: new Date().toISOString()
@@ -424,7 +436,7 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
 
       // Show success toast
       toast.success('ML Model Analysis Complete!', {
-        description: `Classification: ${result.tfopwg_disp}`,
+        description: `Classification: ${result.koi_pdisposition}`,
         duration: 5000,
       });
 
@@ -1094,28 +1106,28 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
                 <div>
                   <div className="text-gray-400">Habitability</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_eqt > 200 && formData.pl_eqt < 350 ? 'Potential' : 'Unlikely'}
+                    {formData.koi_teq > 200 && formData.koi_teq < 350 ? 'Potential' : 'Unlikely'}
                   </div>
                 </div>
                 <div>
                   <div className="text-gray-400">Size Class</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_rade < 1.25 ? 'Earth-like' : 
-                     formData.pl_rade < 2 ? 'Super-Earth' : 'Gas Giant'}
+                    {formData.koi_prad < 1.25 ? 'Earth-like' : 
+                     formData.koi_prad < 2 ? 'Super-Earth' : 'Gas Giant'}
                   </div>
                 </div>
                 <div>
                   <div className="text-gray-400">Orbit Type</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_orbper < 10 ? 'Ultra-Short' : 
-                     formData.pl_orbper < 100 ? 'Short' : 'Long'}
+                    {formData.koi_period < 10 ? 'Ultra-Short' : 
+                     formData.koi_period < 100 ? 'Short' : 'Long'}
                   </div>
                 </div>
                 <div>
                   <div className="text-gray-400">Transit Signal</div>
                   <div className="text-red-300 font-medium">
-                    {formData.pl_trandep > 0.001 ? 'Strong' : 
-                     formData.pl_trandep > 0.0001 ? 'Moderate' : 'Weak'}
+                    {formData.koi_depth > 0.001 ? 'Strong' : 
+                     formData.koi_depth > 0.0001 ? 'Moderate' : 'Weak'}
                   </div>
                 </div>
               </div>

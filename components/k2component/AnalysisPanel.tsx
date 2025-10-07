@@ -38,10 +38,8 @@ import { toast } from 'sonner';
 
 interface AnalysisPanelProps {
   planet: K2PlanetData;
-  isOpen: boolean;
   onClose: () => void;
   onUpdate: (data: Partial<K2PlanetData>) => void;
-  onAnalyze: (planet: K2PlanetData) => void;
 }
 
 

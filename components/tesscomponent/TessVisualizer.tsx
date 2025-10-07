@@ -205,11 +205,6 @@ export default function TessVisualizer() {
     setSelectedPlanet(prev => prev ? { ...prev, ...updatedData } : null);
   }, [planets, selectedPlanet]);
 
-  const handleAnalyzePlanet = useCallback(async () => {
-  
-    handleUpdatePlanet({ isAnalyzing: true });
-   
-  }, [handleUpdatePlanet]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-[#0b0f19] via-[#1a2034] to-[#0b0f19]">
@@ -313,10 +308,8 @@ export default function TessVisualizer() {
         {isPanelOpen && selectedPlanet && (
           <AnalysisPanel
             planet={selectedPlanet}
-            isOpen={isPanelOpen}
             onClose={handleClosePanel}
             onUpdate={handleUpdatePlanet}
-            onAnalyze={handleAnalyzePlanet}
           />
         )}
       </AnimatePresence>
