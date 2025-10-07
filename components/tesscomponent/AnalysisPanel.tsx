@@ -16,10 +16,8 @@ import AWSCredentialsDialog from '@/components/ui/aws-credentials-dialog';
 
 interface AnalysisPanelProps {
   planet: TessPlanetData;
-  isOpen: boolean;
   onClose: () => void;
   onUpdate: (data: Partial<TessPlanetData>) => void;
-  onAnalyze: (planet: TessPlanetData) => void;
 }
 
 interface AWSCredentials {
@@ -172,18 +170,13 @@ const parameters: ParameterConfig[] = [
   }
 ];
 
-export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAnalyze }: AnalysisPanelProps) {
+export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPanelProps) {
   const [formData, setFormData] = useState(planet);
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false);
   const [userCredentials, setUserCredentials] = useState<AWSCredentials | null>(null);
   const [hasEnvCredentials, setHasEnvCredentials] = useState(false);
   const [showResultDialog, setShowResultDialog] = useState(false);
 
-  const formatConfidencePercent = (value?: number) => {
-    if (value === undefined || value === null || isNaN(value)) return '—';
-    const pct = value <= 1 ? value * 100 : value;
-    return `${pct.toFixed(1)}%`;
-  };
 
   useEffect(() => {
     setFormData(planet);
@@ -209,16 +202,6 @@ export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAna
     onUpdate({ [key]: value });
   };
 
-  const getTessDispositionName = (disposition: string) => {
-    switch (disposition) {
-      case 'PC': return 'PC (Planetary Candidate)';
-      case 'CP': return 'CP (Confirmed Planet)';
-      case 'FP': return 'FP (False Positive)';
-      case 'APC': return 'APC (Ambiguous Planetary Candidate)';
-      case 'KP': return 'KP (Known Planet)';
-      default: return disposition;
-    }
-  };
 
   const handleAnalyze = async () => {
     try {

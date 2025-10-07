@@ -11,21 +11,19 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { TessPlanetData } from './TessVisualizer';
+import { PlanetData } from './KeplerVisualizer';
 import { ResultDialog } from '@/components/ui/result-dialog';
 import { toast } from 'sonner';
 
 interface AnalysisPanelProps {
-  planet: TessPlanetData;
-  isOpen: boolean;
+  planet: PlanetData;
   onClose: () => void;
-  onUpdate: (data: Partial<TessPlanetData>) => void;
-  onAnalyze: (planet: TessPlanetData) => void;
+  onUpdate: (data: Partial<PlanetData>) => void;
 }
 
 
 interface ParameterConfig {
-  key: keyof TessPlanetData;
+  key: keyof PlanetData;
   label: string;
   icon: React.ReactNode;
   min: number;
@@ -168,7 +166,7 @@ const parameters: ParameterConfig[] = [
   }
 ];
 
-export default function AnalysisPanel({ planet, isOpen, onClose, onUpdate, onAnalyze }: AnalysisPanelProps) {
+export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPanelProps) {
   const [formData, setFormData] = useState(() => ({
     ...planet,
     // Ensure all numeric values are defined with random values if undefined
