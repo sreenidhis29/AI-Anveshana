@@ -4,9 +4,29 @@ import { askGemini } from '@/helper/gemini_service';
 // Using Gemini via helper
 
 export async function POST(request: NextRequest) {
-  console.log("Starting exoplanet analysis with Gemini");
+  console.log("Starting Kepler exoplanet analysis with Gemini");
   try {
     const data = await request.json();
+
+    // Validate required parameters
+    const requiredParams = [
+      'koi_score', 'koi_period', 'koi_time0bk', 'koi_impact',
+      'koi_duration', 'koi_depth', 'koi_prad', 'koi_teq',
+      'koi_insol', 'koi_steff', 'koi_slogg', 'koi_srad',
+      'koi_model_snr', 'koi_srho'
+    ];
+
+    const missingParams = requiredParams.filter(param => data[param] === undefined || data[param] === null);
+    if (missingParams.length > 0) {
+      console.log('Missing required parameters:', missingParams);
+      return NextResponse.json(
+        {
+          error: `Missing required parameters: ${missingParams.join(', ')}`,
+          success: false
+        },
+        { status: 400 }
+      );
+    }
 
     const { ...planetData } = data;
 

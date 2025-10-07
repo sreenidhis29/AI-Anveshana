@@ -247,7 +247,7 @@ export default function AnalysisPanel({ planet, onClose, onUpdate }: AnalysisPan
         koi_srho: formData.koi_srho,
       };
 
-      const response = await fetch('/api/predict-tess', {
+      const response = await fetch('/api/predict-keppler', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

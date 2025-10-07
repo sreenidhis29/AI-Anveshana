@@ -6,6 +6,25 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
+    // Validate required parameters
+    const requiredParams = [
+      'pl_orbper', 'pl_trandep', 'pl_trandur', 'pl_imppar',
+      'pl_rade', 'pl_massj', 'pl_dens', 'pl_insol', 'pl_eqt',
+      'st_teff', 'st_rad', 'st_mass', 'st_logg', 'ra', 'dec'
+    ];
+
+    const missingParams = requiredParams.filter(param => data[param] === undefined || data[param] === null);
+    if (missingParams.length > 0) {
+      console.log('Missing required parameters:', missingParams);
+      return NextResponse.json(
+        {
+          error: `Missing required parameters: ${missingParams.join(', ')}`,
+          success: false
+        },
+        { status: 400 }
+      );
+    }
+
     const {
       pl_orbper,
       pl_trandep,
